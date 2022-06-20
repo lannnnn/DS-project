@@ -19,7 +19,7 @@ import java.io.IOException;
 
 public class MultiCache {
   // data define
-  // final static int ;s
+  // final static int ;
 
   // function define
   public static void main(String[] args) {
