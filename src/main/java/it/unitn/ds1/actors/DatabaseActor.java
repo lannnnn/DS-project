@@ -10,10 +10,16 @@ import java.util.concurrent.TimeUnit;
 // database actor, will not crash, save final data
 public abstract class DatabaseActor extends BaseActor {
     // database actor parameters
+    private List<ActorRef> children; // L1 cache children
+    private Map<Integer, Integer> data; // data consists of integer value with global-unique key 
 
     // database actor constucure
     public DatabaseActor( ) {
 
+    }
+
+    static public Props props() {
+        return Props.create(DatabaseActor.class, () -> new DatabaseActor());
     }
 
     // override

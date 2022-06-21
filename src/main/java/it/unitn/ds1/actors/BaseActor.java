@@ -11,6 +11,13 @@ import java.util.concurrent.TimeUnit;
 // basically handling common issues like timeout, ack etc.
 public abstract class BaseActor extends AbstractActor {
     // base actor parameters
+    public static final int TIMEOUT = 1000;
+    public static final int RECOVERY_MIN_TIME = 3000;
+    public static final int RECOVERY_MAX_TIME = 10000;
+
+    public enum Stage {
+        Read, Write, Refill, Remove, Result
+    }
 
     // base actor constucure
     public BaseActor( ) {
