@@ -132,6 +132,41 @@ public static class CREAD extends Message implements Serializable {
         }
     }
 
+    public static class TEST implements Serializable {
+        public String s;
+        public ActorRef sender;
+        public TEST(String s, ActorRef sender){
+            this.s = s;
+            this.sender = sender;
+        }
+    }
+//    public static class Timeout implements Serializable {
+//        public Object message;
+//        public String type;
+//        public Timeout(Object message, String type){
+//            this.message = message;
+//            this.type = type;
+//        }
+//    }
+    public static class Timeout implements Serializable {
+
+        public Timeout(){
+
+        }
+    }
+
+    public static class CRASH implements Serializable {
+    }
+    public static class ImBack implements Serializable {
+        ActorRef L1;
+        ActorRef L2;
+        public ImBack(ActorRef L1, ActorRef L2){
+            this.L1 = L1;
+            this.L2 = L2;
+        }
+    }
+
+
 //    public static class
 
 

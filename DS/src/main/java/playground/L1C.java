@@ -3,11 +3,10 @@ package playground;
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import scala.concurrent.duration.Duration;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class L1C extends AbstractActor {
     private Random rnd = new Random();
@@ -23,6 +22,10 @@ public class L1C extends AbstractActor {
     private int child_counter;
     private String check_state;
     private Boolean state;
+    private Boolean crash;
+    private List<ActorRef> childrenDontKnowImBack;
+    private int waitingTime;
+    private int counter;
 
 
     public L1C(ActorRef receiverActor, int id) {
@@ -33,83 +36,104 @@ public class L1C extends AbstractActor {
         this.MyLog = getSelf().path().name() + ": ";
         this.sent = false;
         this.continer = new ArrayList<>();
+        this.crash = false;
+        this.childrenDontKnowImBack = new ArrayList<>();
+        this.waitingTime =  150;
+        this.counter = 0;
+
     }
 
     private void tell_your_parent(ActorRef receiver){
         receiver.tell(getSelf(), getSelf());
     }
 
-    private void read(Message.READ s){
-        if(s.forward){
-            if(this.sent){
-                this.continer.add(s);
-            }else {
-                if(this.Ldata.containsKey(s.key)) {
-                    s.value = this.Ldata.get(s.key);
-                    s.forward = false;
-                    System.out.println(getSelf().path().name()+" yes, I had it!  "+s.value);
-                    this.MyLog = this.MyLog + " {"+ s.L2.path().name()+" LR "+s.value+"}";
-                    this.sendMessageR(s,s.L2);
-
+    private void read(Message.READ msg){
+        if(!this.crash){
+            if(msg.forward){
+                if(this.sent){
+                    this.continer.add(msg);
                 }else {
-                    s.L1 = getSelf();
-                    this.sent = true;
-                    this.MyLog = this.MyLog + " {"+ s.L2.path().name()+" R ("+ s.key+") "+this.parent.path().name()+"}";
-                    this.sendMessageR(s,this.parent);
+                    if(this.Ldata.containsKey(msg.key)) {
+                        msg.value = this.Ldata.get(msg.key);
+                        msg.forward = false;
+                        this.MyLog = this.MyLog + " {"+ msg.L2.path().name()+" LR "+msg.value+"}";
+                        this.sendMessageR(msg,msg.L2);
+
+                    }else {
+                        msg.L1 = getSelf();
+                        this.sent = true;
+                        this.MyLog = this.MyLog + " {SR "+ msg.L2.path().name()+" "+ msg.key +"> "+this.parent.path().name()+"}";
+                        this.sendMessageR(msg,this.parent);
+                    }
                 }
-            }
 
-        }else {
-            this.Ldata.put(s.key, s.value);
-            this.sent = false;
-            this.MyLog = this.MyLog + " {"+ getSender().path().name()+" GR ("+ s.key+","+s.value+") "+s.L2.path().name()+"}";
-            this.sendMessageR(s,s.L2);
-            if(!this.continer.isEmpty()){this.nextMessage();}
-
-        }
-    }
-
-    private void write(Message.WRITE s){
-        if(s.forward){
-            if(this.sent){
-                this.continer.add(s);
             }else {
-                this.sent = true;
-                s.L1 = getSelf();
-                sendMessageW(s, this.parent);
-            }
 
-        } else {
-            if(this.Ldata.containsKey(s.key)) {
-                this.Ldata.put(s.key, s.value);
-            }
-            for(int i = 0; i < L2s.toArray().length; i++){
-                L2s.get(i).tell(s,getSelf());
-            }
-            if(s.L1 == getSelf()){
+                this.Ldata.put(msg.key, msg.value);
                 this.sent = false;
+                this.MyLog = this.MyLog + " {GR "+getSender().path().name()+" ("+ msg.key+","+ msg.value+")> "+msg.L2.path().name()+"}";
+                this.sendMessageR(msg,msg.L2);
                 if(!this.continer.isEmpty()){this.nextMessage();}
             }
+        }else {
+            System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>   "+msg.L2.path().name());
+        }
+    }
+
+    private void write(Message.WRITE msg){
+        if(!this.crash){
+            if(msg.forward){
+                if(this.sent){
+                    this.continer.add(msg);
+                }else {
+                    this.sent = true;
+                    msg.L1 = getSelf();
+                    this.MyLog = this.MyLog + " {SW " + getSender().path().name()+ "(" +msg.key+","+msg.value+")>"+this.parent.path().name()+"}";
+                    sendMessageW(msg, this.parent);
+                }
+
+            } else {
+                if(this.Ldata.containsKey(msg.key)) {
+                    this.Ldata.put(msg.key, msg.value);
+                    this.MyLog = this.MyLog + "{newData ("+msg.key+","+msg.value+")"+getSender().path().name()+" }";
+
+                }
+//                System.out.println(findDifference(this.L2s,this.childrenDontKnowImBack).toArray().length + " ___________ "+ this.L2s.toArray().length);
+                List<ActorRef> childrenKnowImBack = new ArrayList<>(findDifference(this.L2s, this.childrenDontKnowImBack));
+
+                for(int i = 0; i < childrenKnowImBack.toArray().length; i++){
+                    childrenKnowImBack.get(i).tell(msg,getSelf());
+                }
+                if(msg.L1 == getSelf()){
+                    this.sent = false;
+                    this.MyLog = this.MyLog + " {GW "+ getSender().path().name()+" ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+                    if(!this.continer.isEmpty()){this.nextMessage();}
+                }
+            }
+        }else {
 
         }
     }
 
-    private void cread(Message.CREAD s){
-        if(s.forward){
-            if(this.sent){
-                this.continer.add(s);
+    private void cread(Message.CREAD msg){
+        if(!this.crash){
+            if(msg.forward){
+                if(this.sent){
+                    this.continer.add(msg);
 
+                }else {
+                    msg.L1 = getSelf();
+                    this.sent = true;
+                    this.MyLog = this.MyLog + " {SCR "+ msg.L2.path().name()+" "+ msg.key +"> "+this.parent.path().name()+"}";
+                    this.sendMessageCR(msg,this.parent);
+                }
             }else {
-                s.L1 = getSelf();
-                this.sent = true;
-                this.sendMessageCR(s,this.parent);
+                this.Ldata.put(msg.key, msg.value);
+                this.sent = false;
+                this.MyLog = this.MyLog + " {GCR "+getSender().path().name()+" ("+ msg.key+","+ msg.value+")> "+msg.L2.path().name()+"}";
+                this.sendMessageCR(msg,msg.L2);
+//                if(!this.continer.isEmpty()){this.nextMessage();}
             }
-        }else {
-            this.Ldata.put(s.key, s.value);
-            this.sent = false;
-            this.sendMessageCR(s,s.L2);
-            if(!this.continer.isEmpty()){this.nextMessage();}
-
         }
     }
 
@@ -201,10 +225,64 @@ public class L1C extends AbstractActor {
                 .match(Message.CWRITE.class, s -> cwrite(s))
                 .match(Message.CW_check.class, s-> checking(s))
                 .match(Message.printLogs.class, s -> printLog())
+                .match(Message.CRASH.class, s -> onCrash())
                 .match(ActorRef.class, s -> gg(s))
+                .match(Message.Timeout.class, s -> timeOutCheck())
+                .match(Message.ImBack.class, s -> {this.childrenDontKnowImBack.remove(s.L2);})
                 .build();
 
     }
+
+    private void onCrash() {
+        if(!this.crash){
+            this.crash = true;
+            this.MyLog += " {CRASH}";
+        }else {
+            this.crash = false;
+            this.Ldata.clear();
+            this.continer.clear();
+            try { Thread.sleep(rnd.nextInt(250, 350)); }
+            catch (InterruptedException e) { e.printStackTrace(); }
+            this.MyLog += " {BACK}";
+            // tell your childs that you are alive!!
+            this.childrenDontKnowImBack = this.L2s;
+            tellChildren();
+        }
+    }
+
+    private void tellChildren() {
+        for(int i = 0; i < this.childrenDontKnowImBack.toArray().length; i++){
+            Message.ImBack msg = new Message.ImBack(getSelf(), null);
+            childrenDontKnowImBack.get(i).tell(msg, getSelf());
+            try { Thread.sleep(rnd.nextInt(10)); }
+            catch (InterruptedException e) { e.printStackTrace(); }
+        }
+        setTimeout(this.waitingTime);
+    }
+
+    void setTimeout(int time) {
+        getContext().system().scheduler().scheduleOnce(
+                Duration.create(time, TimeUnit.MILLISECONDS),
+                getSelf(),
+                new Message.Timeout(), // the message to send
+                getContext().system().dispatcher(), getSelf()
+        );
+    }
+    private void timeOutCheck() {
+        if(!this.childrenDontKnowImBack.isEmpty() || this.counter > 3){
+            tellChildren();
+            this.counter++;
+        }
+        this.MyLog += " {Almost children know!}";
+    }
+
+    private static <T> Set<T> findDifference(List<T> first, List<T> second)
+    {
+        Set<T> diff = new HashSet<>(first);
+        diff.removeAll(second);
+        return diff;
+    }
+
 
 
 

@@ -5,25 +5,25 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import scala.concurrent.duration.Duration;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 public class Client extends AbstractActor {
 
-    private int n_reads;
-    private int n_writes;
-    private int n_cread;
-    private int n_cwrites;
     private String MyLog;
     private Boolean sent;
     private List<ActorRef> L2Crefs;
-    private ActorRef receiver;
     private final int id;
     private Random rnd = new Random();
 
     private List<Message> continer;
 
+    private int waitingTime;
+    private Object lastMessage;
+    private boolean timeoutSend;
 
     public Client(List<ActorRef> receiverActors, int id) {
         this.L2Crefs = receiverActors;
@@ -31,6 +31,9 @@ public class Client extends AbstractActor {
         this.MyLog = getSelf().path().name() + ": ";
         this.continer = new ArrayList<>();
         this.sent = false;
+        this.waitingTime = 2500;
+        this.lastMessage = null;
+        this.timeoutSend = false;
 
     }
 
@@ -38,15 +41,17 @@ public class Client extends AbstractActor {
         this.sent = true;
         msg.L2.tell(msg, getSelf());
         this.MyLog = this.MyLog + " {R "+msg.key+">"+msg.L2.path().name()+"}";
-        try { Thread.sleep(rnd.nextInt(100)); }
+        this.lastMessage = msg;
+        try { Thread.sleep(rnd.nextInt(10)); }
         catch (InterruptedException e) { e.printStackTrace(); }
     }
 
     private void sendWriteMessage(Message.WRITE msg){
         this.sent = true;
-        this.MyLog = this.MyLog + " {W ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
         msg.L2.tell(msg, getSelf());
-        try { Thread.sleep(rnd.nextInt(100)); }
+        this.MyLog = this.MyLog + " {W ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.lastMessage = msg;
+        try { Thread.sleep(rnd.nextInt(10)); }
         catch (InterruptedException e) { e.printStackTrace(); }
     }
 
@@ -54,7 +59,16 @@ public class Client extends AbstractActor {
         this.sent = true;
         msg.L2.tell(msg, getSelf());
         this.MyLog = this.MyLog + " {CR "+msg.key+">"+msg.L2.path().name()+"}";
-        try { Thread.sleep(rnd.nextInt(100)); }
+        this.lastMessage = msg;
+        try { Thread.sleep(rnd.nextInt(10)); }
+        catch (InterruptedException e) { e.printStackTrace(); }
+    }
+    private void sendCWriteMessage(Message.CWRITE msg){
+        this.sent = true;
+        msg.L2.tell(msg, getSelf());
+        this.MyLog = this.MyLog + " {CW ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.lastMessage = msg;
+        try { Thread.sleep(rnd.nextInt(10)); }
         catch (InterruptedException e) { e.printStackTrace(); }
     }
     
@@ -62,71 +76,82 @@ public class Client extends AbstractActor {
     static public Props props(List<ActorRef> receiverActor, int id) {
         return Props.create(Client.class, () -> new Client(receiverActor, id));
     }
+    private void ReadHandeler(Message.READ msg){
+        if(msg.forward){
+            if(this.sent || this.timeoutSend){
+                this.continer.add(msg);
+            }
+            else {
+                msg.L2 = chooseL2();
+                sendReadMessage(msg);
+                setTimeout(this.waitingTime, msg);
+            }
+        }else {
+            receiveRead(msg);
+        }
+    }
+
+    private void WriteHandeler(Message.WRITE msg){
+        if(msg.forward){
+            if(this.sent || this.timeoutSend){
+                this.continer.add(msg);
+            }
+            else {
+                msg.L2 = chooseL2();
+                sendWriteMessage(msg);
+                setTimeout(this.waitingTime, msg);}
+        }else {
+            receiveWrite(msg);
+        }
+    }
+
+    private void CReadHandeler(Message.CREAD msg) {
+        if(msg.forward){
+            if(this.sent || this.timeoutSend){
+                this.continer.add(msg);
+            }
+            else {
+                msg.L2 = chooseL2();
+                sendCReadMessage(msg);
+                setTimeout(this.waitingTime, msg);}
+        }else {
+            receiveCRead(msg);
+        }
+    }
+
+    private void CWriteHandeler(Message.CWRITE msg) {
+        if(msg.forward){
+            if(this.sent || this.timeoutSend){
+                this.continer.add(msg);
+            }
+            else {
+                msg.L2 = chooseL2();
+                sendCWriteMessage(msg);
+                setTimeout(this.waitingTime, msg);}
+        }else {
+            receiveCWrite(msg);
+        }
+    }
+
     private void receiveRead(Message.READ msg){
-        System.out.println(" I got "+ msg.value);
         this.MyLog = this.MyLog + " {GR ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
         this.sent = false;
-        if(!this.continer.isEmpty()){this.nextMessage();}
+//        if(!this.continer.isEmpty()){this.nextMessage();}
     }
     private void receiveWrite(Message.WRITE msg){
         this.MyLog = this.MyLog + " {GW ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
         this.sent = false;
-        if(!this.continer.isEmpty()){this.nextMessage();}
-
-
+//        if(!this.continer.isEmpty()){this.nextMessage();}
     }
-    private void ReadHandeler(Message.READ s){
-        if(s.forward){
-//            System.out.println(getSelf().path().name()+": I got R "+ s.key+ " and sent it");
-            if(sent == false){
-                sendReadMessage(s);
-            }
-            else {
-                this.continer.add(s);
-            }
-        }else {
-            receiveRead(s);
-        }
-    }
-
-    private void WriteHandeler(Message.WRITE s){
-        if(s.forward){
-            if(sent == false){
-                sendWriteMessage(s);
-            }
-            else {
-                this.continer.add(s);
-            }
-
-        }else {
-            receiveWrite(s);
-        }
-    }
-
-    private void CReadHandeler(Message.CREAD s) {
-
-        if(s.forward){
-            if(sent == false){
-                sendCReadMessage(s);
-            }
-            else {
-                this.continer.add(s);
-            }
-
-        }else {
-            receiveCRead(s);
-        }
-
-    }
-
-    private void CWriteHandeler(Message.CWRITE s) {
-    }
-
     private void receiveCRead(Message.CREAD msg){
-        System.out.println(" I got "+ msg.value);
         this.MyLog = this.MyLog + " {GCR ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
         this.sent = false;
-        if(!this.continer.isEmpty()){this.nextMessage();}
+//        if(!this.continer.isEmpty()){this.nextMessage();}
+    }
+    private void receiveCWrite(Message.CWRITE msg) {
+        this.MyLog = this.MyLog + " {GCW ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.sent = false;
+//        if(!this.continer.isEmpty()){this.nextMessage();}
     }
 
     private void printLog(){
@@ -151,17 +176,95 @@ public class Client extends AbstractActor {
                 .match(Message.CREAD.class, s -> CReadHandeler(s))
                 .match(Message.CWRITE.class, s -> CWriteHandeler(s))
                 .match(Message.printLogs.class, s -> printLog())
-                .match(String.class, s -> testing(s))
+                .match(Message.Timeout.class, s -> timeOutCheck())
                 .build();
 
     }
 
-    private void testing(String s) {
-        System.out.println(s + getSender().path().name());
-        getSender().tell("boooo", getSelf());
-        this.sent.notify();
+    private void timeOutCheck() {
+        if(this.sent){
+            System.out.println(getSelf().path().name()+" shit, someone crashed!!" );
+            crashHandler();
+        }else {
+            this.timeoutSend = false;
+            if(!this.continer.isEmpty()){this.nextMessage();}
+
+        }
     }
 
+    private void crashHandler() {
+        this.MyLog = this.MyLog + " {Parent crashed} ";
 
+
+        if (this.lastMessage.getClass().equals(Message.READ.class)){//Message.READ.class.equals(s.getClass())) {
+            Message.READ msg;
+            msg = (Message.READ) this.lastMessage;
+            System.out.println(msg.key +" "+ msg.L2.path().name());
+            msg.L2 = chooseNewL2(msg.L2);
+            sendReadMessage(msg);
+            setTimeout(this.waitingTime,msg);
+
+
+        } else if (this.lastMessage.getClass().equals(Message.WRITE.class)){//Message.WRITE.class.equals(s.getClass())) {
+            Message.WRITE msg;
+            msg = (Message.WRITE) this.lastMessage;
+            System.out.println(msg.key +" "+ msg.L2.path().name());
+            msg.L2 = chooseNewL2(msg.L2);
+            sendWriteMessage(msg);
+            setTimeout(this.waitingTime,msg);
+
+//            ((Message.WRITE) s).L2 = chooseNewL2(((Message.WRITE) s).L2);
+//            sendWriteMessage((Message.WRITE) s);
+//            setTimeout(this.waitingTime,s);
+
+        } else if (this.lastMessage.getClass().equals(Message.CREAD.class)){//Message.CREAD.class.equals(s.getClass())) {
+            Message.CREAD msg;
+            msg = (Message.CREAD) this.lastMessage;
+            System.out.println(msg.key +" "+ msg.L2.path().name());
+            msg.L2 = chooseNewL2(msg.L2);
+            sendCReadMessage(msg);
+            setTimeout(this.waitingTime,msg);
+
+//            ((Message.CREAD) s).L2 = chooseNewL2(((Message.CREAD) s).L2);
+//            sendCReadMessage((Message.CREAD) s);
+//            setTimeout(this.waitingTime,s);
+
+        } else if (this.lastMessage.getClass().equals(Message.CWRITE.class)){//Message.CWRITE.class.equals(s.getClass())) {
+            Message.CWRITE msg;
+            msg = (Message.CWRITE) this.lastMessage;
+            System.out.println(msg.key +" "+ msg.L2.path().name());
+            msg.L2 = chooseNewL2(msg.L2);
+            sendCWriteMessage(msg);
+            setTimeout(this.waitingTime,msg);
+
+//            ((Message.CWRITE) s).L2 = chooseNewL2(((Message.CWRITE) s).L2);
+//            sendCWriteMessage((Message.CWRITE) s);
+//            setTimeout(this.waitingTime, s);
+        }
+    }
+
+    void setTimeout(int time, Object message) {
+        this.timeoutSend = true;
+        getContext().system().scheduler().scheduleOnce(
+                Duration.create(time, TimeUnit.MILLISECONDS),
+                getSelf(),
+                new Message.Timeout(), // the message to send
+                getContext().system().dispatcher(), getSelf()
+        );
+    }
+    private ActorRef chooseL2(){
+        int indx = ThreadLocalRandom.current().nextInt(this.L2Crefs.toArray().length);
+        ActorRef L2 =  this.L2Crefs.get(indx);
+        return L2;
+    }
+    private ActorRef chooseNewL2(ActorRef l2){
+        int indx = ThreadLocalRandom.current().nextInt(this.L2Crefs.toArray().length);
+        ActorRef newL2 = this.L2Crefs.get(indx);
+        while(l2 == newL2){
+            indx = ThreadLocalRandom.current().nextInt(this.L2Crefs.toArray().length);
+            newL2 =  this.L2Crefs.get(indx);
+        }
+        return newL2;
+    }
 
 }

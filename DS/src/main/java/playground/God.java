@@ -3,8 +3,10 @@ package playground;
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
+import akka.util.Timeout;
+import scala.concurrent.Future;
+import scala.concurrent.duration.Duration;
 
-import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -12,6 +14,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import static akka.pattern.Patterns.ask;
+
 
 public class God extends AbstractActor {
 
@@ -21,16 +24,27 @@ public class God extends AbstractActor {
 
         // making task
 
-        List<Object> msg = this.generate_tasks(6,5, 2,L2cs);
+        List<Object> msg = this.generate_tasks(3,3, 5,L2cs);
         System.out.println("God: generate "+ msg.toArray().length+ " tasks!");
+
         // sending tasks to clienst
+//        System.out.println(L1cs.get(0).path().name());
+        setTimeout(1500,L1cs.get(0));
+        setTimeout(3000,L1cs.get(0));
+        setTimeout(450,L1cs.get(1));
+        setTimeout(1500,L1cs.get(1));
+        setTimeout(250,L2cs.get(1));
+        setTimeout(700,L2cs.get(1));
+
+        setTimeout(350,L2cs.get(0));
+        setTimeout(1500,L2cs.get(0));
 
         this.doing_tasks(msg, Clients);
 
         //ending ask every one to print their log
 
         try {
-            TimeUnit.SECONDS.sleep(5);
+            TimeUnit.SECONDS.sleep(12);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -41,7 +55,7 @@ public class God extends AbstractActor {
             Clients.get(i).tell(print_log, getSelf());
         }
         try {
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.SECONDS.sleep(2);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -52,7 +66,7 @@ public class God extends AbstractActor {
         }
         System.out.println("");
         try {
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.SECONDS.sleep(2);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -61,6 +75,15 @@ public class God extends AbstractActor {
 
             L1cs.get(i).tell(print_log, getSelf());
         }
+
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        System.out.println();
+        database.tell(print_log, getSelf());
 
     }
 
@@ -94,12 +117,12 @@ public class God extends AbstractActor {
         for(int n_r = 0; n_r < n_reads; n_r++){
 
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
-
             int indx = ThreadLocalRandom.current().nextInt(0, Lc2ref.toArray().length);
+
             Message.READ MSG = new Message.READ(String.valueOf(key_to_ask),
                     null,
                     null,
-                    Lc2ref.get(indx),
+                    null,
                     null,
                     true);
             messageList.add(MSG);
@@ -113,7 +136,7 @@ public class God extends AbstractActor {
             Message.WRITE MSG = new Message.WRITE(String.valueOf(key_to_ask),
                     String.valueOf(value_to_write),
                     null,
-                    Lc2ref.get(indx),
+                    null,
                     null,
                     true);
             messageList.add(MSG);
@@ -126,7 +149,7 @@ public class God extends AbstractActor {
             Message.CREAD MSG = new Message.CREAD(String.valueOf(key_to_ask),
                     null,
                     null,
-                    Lc2ref.get(indx),
+                    null,
                     null,
                     true);
             messageList.add(MSG);
@@ -142,5 +165,14 @@ public class God extends AbstractActor {
     public Receive createReceive() {
         return receiveBuilder().match(String.class, s -> System.out.println(s)).build();
 
+    }
+
+    void setTimeout(int time, ActorRef reciver) {
+        getContext().system().scheduler().scheduleOnce(
+                Duration.create(time, TimeUnit.MILLISECONDS),
+                reciver,
+                new Message.CRASH(), // the message to send
+                getContext().system().dispatcher(), getSelf()
+        );
     }
 }

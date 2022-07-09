@@ -17,9 +17,9 @@ import akka.actor.ActorSystem;
 
 
 public class App {
-    final static int n_client = 2;
-    final static int n_l2 = 2;
-    final static int n_l1 = 1;
+    final static int n_client = 3;
+    final static int n_l2 = 3;
+    final static int n_l1 = 2;
 
 
     public static void main(String[] args) {
@@ -49,7 +49,7 @@ public class App {
         // Create Level 2 cache actors
         for(int i = 0; i<n_l2; i++){
             l2s.add(system.actorOf(
-                    L2C.props(l1s,id_counter++),    // actor class
+                    L2C.props(l1s,DB,id_counter++),    // actor class
                     "L2_"+i    // the new actor name (unique within the system)
             ));
         }

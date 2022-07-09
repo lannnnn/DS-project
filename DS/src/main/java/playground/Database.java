@@ -21,6 +21,7 @@ public class Database extends AbstractActor {
     private boolean cw_waiting;
     private List<Message> continer;
     private String checkingState;
+    private String Mylog;
 
 
 
@@ -36,6 +37,7 @@ public class Database extends AbstractActor {
         System.out.println(!false);
         this.cw_waiting = false;
         this.checkingState = "";
+        this.Mylog = getSelf().path().name()+": ";
     }
     static public Props props() {
         return Props.create(Database.class, () -> new Database());
@@ -48,6 +50,7 @@ public class Database extends AbstractActor {
         }else {
             s.value = this.data.get(s.key);
             s.forward = false;
+            Mylog += " {R"+ getSender().path().name() + ">(" + s.key + ","+s.value+") } ";
             getSender().tell(s, getSelf());
             try { Thread.sleep(rnd.nextInt(20)); }
             catch (InterruptedException e) { e.printStackTrace(); }
@@ -55,33 +58,39 @@ public class Database extends AbstractActor {
 
 
     }
+
+    private void write(Message.WRITE s){
+        if (cw_waiting){
+            continer.add(s);
+        }else {
+            this.data.put(s.key,s.value);
+            Mylog += " {W"+ getSender().path().name() + ">(" + s.key + ","+s.value+") } ";
+            s.forward = false;
+            s.done = true;
+            if(s.L1 != getSender()){
+                getSender().tell(s,getSelf());
+            }
+            for(int i = 0; i < L1s.toArray().length; i++){
+                L1s.get(i).tell(s,getSelf());
+            }
+            try { Thread.sleep(rnd.nextInt(20)); }
+            catch (InterruptedException e) { e.printStackTrace(); }
+        }
+
+
+    }
+
     private void cread(Message.CREAD s) {
         if (cw_waiting){
             continer.add(s);
         }else {
             s.value = this.data.get(s.key);
             s.forward = false;
+            Mylog += " {CR"+ getSender().path().name() + ">(" + s.key + ","+s.value+") } ";
             getSender().tell(s, getSelf());
             try { Thread.sleep(rnd.nextInt(20)); }
             catch (InterruptedException e) { e.printStackTrace(); }
         }
-
-    }
-
-
-
-    private void wirte(Message.WRITE s){
-        if (cw_waiting){
-            continer.add(s);
-        }else {
-            this.data.put(s.key,s.value);
-            s.forward = false;
-            s.done = true;
-            for(int i = 0; i < L1s.toArray().length; i++){
-                L1s.get(i).tell(s,getSelf());
-            }
-        }
-
 
     }
     private void cwrite(Message.CWRITE s){
@@ -150,11 +159,14 @@ public class Database extends AbstractActor {
     public Receive createReceive() {
         return receiveBuilder()
                 .match(Message.READ.class, s -> read(s))
-                .match(Message.WRITE.class, s -> wirte(s))
+                .match(Message.WRITE.class, s -> write(s))
                 .match(Message.CREAD.class, s -> cread(s))
                 .match(Message.CWRITE.class, s ->cwrite(s))
                 .match(Message.CW_check.class, s -> checking(s))
                 .match(ActorRef.class, s -> gg(s))
+                .match(Message.printLogs.class, s -> {
+                    System.out.println(this.Mylog);
+                })
                 .build();
 
     }
