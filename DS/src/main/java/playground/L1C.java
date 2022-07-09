@@ -38,7 +38,7 @@ public class L1C extends AbstractActor {
         this.continer = new ArrayList<>();
         this.crash = false;
         this.childrenDontKnowImBack = new ArrayList<>();
-        this.waitingTime =  150;
+        this.waitingTime =  250;
         this.counter = 0;
 
     }
@@ -76,7 +76,6 @@ public class L1C extends AbstractActor {
                 if(!this.continer.isEmpty()){this.nextMessage();}
             }
         }else {
-            System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>   "+msg.L2.path().name());
         }
     }
 
@@ -205,7 +204,7 @@ public class L1C extends AbstractActor {
         // send to parent
     }
 
-    public void gg(ActorRef receiver){
+    public void addingChild(ActorRef receiver){
         this.L2s.add(receiver);
     }
 
@@ -226,7 +225,7 @@ public class L1C extends AbstractActor {
                 .match(Message.CW_check.class, s-> checking(s))
                 .match(Message.printLogs.class, s -> printLog())
                 .match(Message.CRASH.class, s -> onCrash())
-                .match(ActorRef.class, s -> gg(s))
+                .match(ActorRef.class, s -> addingChild(s))
                 .match(Message.Timeout.class, s -> timeOutCheck())
                 .match(Message.ImBack.class, s -> {this.childrenDontKnowImBack.remove(s.L2);})
                 .build();
@@ -241,7 +240,7 @@ public class L1C extends AbstractActor {
             this.crash = false;
             this.Ldata.clear();
             this.continer.clear();
-            try { Thread.sleep(rnd.nextInt(250, 350)); }
+            try { Thread.sleep(rnd.nextInt(100)+250); }
             catch (InterruptedException e) { e.printStackTrace(); }
             this.MyLog += " {BACK}";
             // tell your childs that you are alive!!
@@ -251,6 +250,7 @@ public class L1C extends AbstractActor {
     }
 
     private void tellChildren() {
+
         for(int i = 0; i < this.childrenDontKnowImBack.toArray().length; i++){
             Message.ImBack msg = new Message.ImBack(getSelf(), null);
             childrenDontKnowImBack.get(i).tell(msg, getSelf());

@@ -24,7 +24,7 @@ public class God extends AbstractActor {
 
         // making task
 
-        List<Object> msg = this.generate_tasks(3,3, 5,L2cs);
+        List<Object> msg = this.generate_tasks(10,3, 5,L2cs);
         System.out.println("God: generate "+ msg.toArray().length+ " tasks!");
 
         // sending tasks to clienst
@@ -37,7 +37,7 @@ public class God extends AbstractActor {
         setTimeout(700,L2cs.get(1));
 
         setTimeout(350,L2cs.get(0));
-        setTimeout(1500,L2cs.get(0));
+        // setTimeout(1500,L2cs.get(0));
 
         this.doing_tasks(msg, Clients);
 

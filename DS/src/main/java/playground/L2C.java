@@ -19,6 +19,7 @@ public class L2C extends AbstractActor {
 
     private List<ActorRef> L1s;
     private ActorRef L1;
+    private ActorRef OldL1;
     private ActorRef databaseRef;
     private final int id;
     private HashMap<String, String> Ldata = new HashMap<String, String>();
@@ -38,7 +39,8 @@ public class L2C extends AbstractActor {
         this.id = id;
         int indx = ThreadLocalRandom.current().nextInt(0, L1s.toArray().length);
         this.L1 = L1s.get(indx);
-        System.out.println(this.L1.path().name());
+        this.OldL1 =  this.L1;
+        System.out.println(getSelf().path().name() + " my parent is " + this.L1.path().name());
         this.tell_your_parent(this.L1);
         this.cw_waiting = false;
         this.MyLog = getSelf().path().name() + ": ";
@@ -46,7 +48,7 @@ public class L2C extends AbstractActor {
         this.timeoutSend = false;
         this.continer = new ArrayList<>();
         this.crash = false;
-        this.waitingTime =  1000;
+        this.waitingTime =  750;
         this.lastMessage = null;
 
     }
@@ -272,12 +274,14 @@ public class L2C extends AbstractActor {
         if(!this.crash){
             this.crash = true;
             this.MyLog += " {CRASH}";
+            System.out.println(getSelf().path().name() +" Crash");
         }else {
+            this.L1 = this.OldL1;
             this.crash = false;
             this.sent = false;
             this.Ldata.clear();
             this.continer.clear();
-            try { Thread.sleep(rnd.nextInt(300, 500)); }
+            try { Thread.sleep(rnd.nextInt(200)+300); }
             catch (InterruptedException e) { e.printStackTrace(); }
             this.MyLog += " {BACK}";
         }

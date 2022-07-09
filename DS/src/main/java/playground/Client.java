@@ -31,7 +31,7 @@ public class Client extends AbstractActor {
         this.MyLog = getSelf().path().name() + ": ";
         this.continer = new ArrayList<>();
         this.sent = false;
-        this.waitingTime = 2500;
+        this.waitingTime = 2000;
         this.lastMessage = null;
         this.timeoutSend = false;
 
