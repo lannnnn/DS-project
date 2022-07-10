@@ -15,47 +15,44 @@ import java.util.concurrent.TimeUnit;
 
 public class L2C extends AbstractActor {
 
-    private Random rnd = new Random();
+    private final int id;                                                  // permanant id for visit
+    private ActorRef parent;                                               // current parent, L1 or database
+    private ActorRef L1;                                                   // original assigned L1
+    private ActorRef databaseRef;                                          
 
-    private List<ActorRef> L1s;
-    private ActorRef L1;
-    private ActorRef OldL1;
-    private ActorRef databaseRef;
-    private final int id;
-    private HashMap<String, String> Ldata = new HashMap<String, String>();
+    private HashMap<String, String> Ldata = new HashMap<String, String>(); // cache data table
+    private List<Message> continer;                                        // message queue
+    private int waitingTime;
     private boolean cw_waiting;
-    private List<Message> continer;
+    private Boolean crash;
     private boolean sent;
+    private Object lastMessage;
     private boolean timeoutSend;
     private String MyLog;
-    private Boolean crash;
-    private int waitingTime;
-    private Object lastMessage;
-
+    private Random rnd = new Random();
 
     public L2C(List<ActorRef> L1s, ActorRef databaseRef,int id) {
-        this.L1s = L1s;
-        this.databaseRef = databaseRef;
         this.id = id;
+        this.databaseRef = databaseRef;
         int indx = ThreadLocalRandom.current().nextInt(0, L1s.toArray().length);
-        this.L1 = L1s.get(indx);
-        this.OldL1 =  this.L1;
-        System.out.println(getSelf().path().name() + " my parent is " + this.L1.path().name());
-        this.tell_your_parent(this.L1);
+        this.parent = L1s.get(indx);
+        this.L1 = this.parent;
+        System.out.println(getSelf().path().name() + ": assigned parent : " + this.parent.path().name());
+        this.tell_your_parent(this.parent);
         this.cw_waiting = false;
-        this.MyLog = getSelf().path().name() + ": ";
+        this.MyLog = getSelf().path().name() + ":\n";
         this.sent = false;
         this.timeoutSend = false;
         this.continer = new ArrayList<>();
         this.crash = false;
-        this.waitingTime =  750;
+        this.waitingTime = 750;
         this.lastMessage = null;
-
     }
 
     private void tell_your_parent(ActorRef receiver){
         receiver.tell(getSelf(), getSelf());
     }
+
     void setTimeout(int time) {
         this.timeoutSend = true;
         getContext().system().scheduler().scheduleOnce(
@@ -67,60 +64,63 @@ public class L2C extends AbstractActor {
     }
 
     private void read(Message.READ msg){
-        if(!crash){
+        // check state, if crashed, do nothing
+        if(!this.crash){
+            // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
+                // if is sending message now or timeout, just add to container
                 if(this.sent || this.timeoutSend){
                     this.continer.add(msg);
                 }else {
+                    // if have the key, return the value, else forward to parent
                     if(this.Ldata.containsKey(msg.key)) {
                         msg.value = this.Ldata.get(msg.key);
                         msg.forward = false;
-                        this.MyLog = this.MyLog + " {"+ msg.c.path().name()+" LR "+msg.value+"}";
+                        this.MyLog = this.MyLog + " {READ EQURE FROM "+ msg.c.path().name()+" FINISHED WITH VALUE ("+msg.key+","+msg.value+")}\n";
                         this.sendMessageR(msg,msg.c);
-
                     }else {
                         msg.L2 = getSelf();
                         this.sent = true;
-                        this.MyLog = this.MyLog + " {SR "+ msg.c.path().name()+" "+ msg.key +"> "+this.L1.path().name()+"}";
+                        this.MyLog = this.MyLog + " {FORWARD READ REQ "+ msg.key +" FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";
                         this.lastMessage = msg;
-                        this.sendMessageR((Message.READ) this.lastMessage,this.L1);
+                        this.sendMessageR((Message.READ) this.lastMessage,this.parent);
                         setTimeout(this.waitingTime);
-
                     }
                 }
-
             }else {
-
-                this.Ldata.put(msg.key, msg.value);
+                this.Ldata.put(msg.key, msg.value);    // update the data table
+                this.MyLog = this.MyLog + " {UPDATE DATA ("+msg.key+","+msg.value+")}\n";
                 this.sent = false;
-                this.MyLog = this.MyLog + " {GR "+getSender().path().name()+" ("+ msg.key+","+ msg.value+")> "+msg.c.path().name()+"}";
+                this.MyLog = this.MyLog + " {BACKWORD READ REQ FROM "+getSender().path().name()+" ("+ msg.key+","+ msg.value+") TO "+msg.c.path().name()+"}\n";
                 this.sendMessageR(msg,msg.c);
-//                if(!this.continer.isEmpty()){this.nextMessage();}
             }
         }
     }
 
     private void write(Message.WRITE msg){
+        // check state, if crashed, do nothing
         if(!this.crash){
+            // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
+                // if is sending message now or timeout, just add to container
                 if(this.sent || this.timeoutSend){
                     this.continer.add(msg);
                 }else {
                     this.sent = true;
                     msg.L2 = getSelf();
-                    this.MyLog = this.MyLog + " {SW ("+msg.key+","+msg.value+")>"+this.L1.path().name()+"}";
-                    sendMessageW(msg, this.L1);
+                    this.MyLog = this.MyLog + " {SEND WRITE REQ("+msg.key+","+msg.value+") FROM " +getSender().path().name() + " TO "+ this.parent.path().name() +"}\n";
+                    sendMessageW(msg, this.parent);
                     this.lastMessage = msg;
                     setTimeout(this.waitingTime);
                 }
             } else {
-                if(this.Ldata.containsKey(msg.key)) {
-                    this.Ldata.put(msg.key, msg.value);
-                    this.MyLog = this.MyLog + "{newData ("+msg.key+","+msg.value+")"+getSender().path().name()+" }";
+                if(this.Ldata.containsKey(msg.key)) {       // only the cache contain the data updated
+                    this.Ldata.put(msg.key, msg.value);     // update the data table
+                    this.MyLog = this.MyLog + " {UPDATE DATA ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+"}\n";
                 }
                 if(msg.L2 == getSelf()){
                     this.sent = false;
-                    this.MyLog = this.MyLog + " {GW "+getSender().path().name()+" ("+msg.key+","+msg.value+")>"+msg.c.path().name()+"}";
+                    this.MyLog = this.MyLog + " {BACKWORD WRITE CERTIFICATION ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+" TO "+msg.c.path().name()+"}\n";
                     this.sendMessageW(msg,msg.c);
                 }
 
@@ -129,33 +129,37 @@ public class L2C extends AbstractActor {
     }
 
     private void cread(Message.CREAD msg){
+        // check state, if crashed, do nothing
         if(!this.crash){
+            // check the direction of the msg(forward to db or backward to client)
+            // goto database anyway
             if(msg.forward){
+                // if is sending message now or timeout, just add to container
                 if(this.sent || this.timeoutSend){
                     this.continer.add(msg);
                 }else {
                     msg.L2 = getSelf();
                     this.sent = true;
-                    this.MyLog = this.MyLog + " {SCR "+ msg.c.path().name()+" "+ msg.key +"> "+this.L1.path().name()+"}";
-                    this.sendMessageCR(msg,this.L1);
+                    this.MyLog = this.MyLog + " {FORWARD CRITICAL READ REQ "+ msg.key +"FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";
+                    this.sendMessageCR(msg,this.parent);
                     this.lastMessage = msg;
                     setTimeout(this.waitingTime);
                 }
             }else {
-                this.Ldata.put(msg.key, msg.value);
+                this.Ldata.put(msg.key, msg.value);  // update the data table
                 this.sent = false;
-                this.MyLog = this.MyLog + " {GCR "+getSender().path().name()+" ("+ msg.key+","+ msg.value+")> "+msg.c.path().name()+"}";
+                this.MyLog = this.MyLog + " {BACKWORD CRITICAL READ REQ FROM "+getSender().path().name()+" ("+ msg.key+","+ msg.value+") TO "+msg.c.path().name()+"}\n";
                 this.sendMessageCR(msg,msg.c);
 
             }
         }
     }
+
     private void cwrite(Message.CWRITE s){
         System.out.println(getSelf().path().name()+": shit!!!");
         this.sent = true;
 
     }
-
 
     private void nextMessage(){
         Object msg = this.continer.get(0);
@@ -169,23 +173,25 @@ public class L2C extends AbstractActor {
         }
     }
 
-
-///// Sending
+// Sender
     private void sendMessageR(Message.READ message, ActorRef reciver){
         reciver.tell(message, getSelf());
         try { Thread.sleep(rnd.nextInt(10)); }
         catch (InterruptedException e) { e.printStackTrace(); }
     }
+
     private void sendMessageW(Message.WRITE message, ActorRef reciver){
         reciver.tell(message, getSelf());
         try { Thread.sleep(rnd.nextInt(10)); }
         catch (InterruptedException e) { e.printStackTrace(); }
     }
+
     private void sendMessageCR(Message.CREAD message, ActorRef reciver){
         reciver.tell(message, getSelf());
         try { Thread.sleep(rnd.nextInt(10)); }
         catch (InterruptedException e) { e.printStackTrace(); }
     }
+
     private void sendMessageCW(Message.CWRITE message, ActorRef reciver){
         reciver.tell(message, getSelf());
         try { Thread.sleep(rnd.nextInt(10)); }
@@ -214,25 +220,23 @@ public class L2C extends AbstractActor {
                 .match(Message.CW_check.class, s -> checking(s))
                 .match(Message.printLogs.class, s -> printLog())
                 .match(Message.CRASH.class, s -> onCrash())
-                .match(Message.ImBack.class, s -> setParent(s)) //I'm back for parent
+                .match(Message.ImBack.class, s -> recover(s)) //I'm back for parent
                 .match(Message.Timeout.class, s -> timeOutCheck())
                 .build();
     }
     private void doNothing(){}
 
-    private void setParent(Message.ImBack msg) {
-        this.L1 = msg.L1;
+    private void recover(Message.ImBack msg) {
+        this.parent = msg.L1;
         msg.L2 = getSelf();
-        this.L1.tell(msg, getSelf());
-        System.out.println(getSelf().path().name()+" it back!! "+ msg.L1.path().name());
+        this.parent.tell(msg, getSelf());
+        System.out.println(msg.L1.path().name() + " recovered, back to be the parent of " + getSelf().path().name());
         try { Thread.sleep(rnd.nextInt(10)); }
         catch (InterruptedException e) { e.printStackTrace(); }
-
     }
 
     private void timeOutCheck() {
         if(this.sent){
-            System.out.println(getSelf().path().name()+"shit, someone crashed!!");
             crashHandler();
         }else {
             this.timeoutSend = false;
@@ -241,51 +245,46 @@ public class L2C extends AbstractActor {
     }
 
     private void crashHandler() {
-        this.L1 = this.databaseRef;
-        System.out.println(this.L1.path().name());
-        MyLog += " {Parent crashed}";
+        if(this.crash) return;
+        MyLog += this.parent.path().name() + " crash detected, resend the request\n";
+        this.parent = this.databaseRef;
         Object msg = this.lastMessage;
         if (Message.READ.class.equals(msg.getClass())) {
-            ((Message.READ) msg).L1 = this.L1;
-            this.MyLog = this.MyLog + " {SR "+ ((Message.READ) msg).c.path().name()+" "+ ((Message.READ) msg).key +"> "+this.L1.path().name()+"}";
+            ((Message.READ) msg).L1 = this.parent;
+            this.MyLog = this.MyLog + " {RE-FORWARD READ REQ "+ ((Message.READ) msg).key +" FROM "+ ((Message.READ) msg).c.path().name()+" TO "+this.parent.path().name()+"}\n";
             sendMessageR((Message.READ) msg, ((Message.READ) msg).L1);
             setTimeout(this.waitingTime);
-
         } else if (Message.WRITE.class.equals(msg.getClass())) {
-            this.MyLog = this.MyLog + " {SW ("+ ((Message.WRITE) msg).key+","+ ((Message.WRITE) msg).value+")>"+this.L1.path().name()+"}";
-            ((Message.WRITE) msg).L1 = this.L1;
+            this.MyLog = this.MyLog + " {RE-SEND WRITE REQ("+((Message.WRITE) msg).key+","+((Message.WRITE) msg).value+") TO "+ this.parent.path().name() +"}\n";
+            ((Message.WRITE) msg).L1 = this.parent;
             sendMessageW((Message.WRITE) msg, ((Message.WRITE) msg).L1);
             setTimeout(this.waitingTime);
-
         } else if (Message.CREAD.class.equals(msg.getClass())) {
-            this.MyLog = this.MyLog + " {SCR "+ ((Message.CREAD) msg).c.path().name()+" "+ ((Message.CREAD) msg).key +"> "+this.L1.path().name()+"}";
-            ((Message.CREAD) msg).L1 = this.L1;
+            this.MyLog = this.MyLog + " {RE-FORWARD CRITICAL READ REQ "+ ((Message.CREAD) msg).key +"FROM "+((Message.CREAD) msg).c.path().name()+" TO "+this.parent.path().name()+"}\n";
+            ((Message.CREAD) msg).L1 = this.parent;
             sendMessageCR((Message.CREAD) msg, ((Message.CREAD) msg).L1);
             setTimeout(this.waitingTime);
-
         } else if (Message.CWRITE.class.equals(msg.getClass())) {
-            sendMessageCW((Message.CWRITE) msg, this.L1);
+            sendMessageCW((Message.CWRITE) msg, this.parent);
             setTimeout(this.waitingTime);
         }
     }
 
-
     private void onCrash() {
+        // first receive: crash, second receive: recover
         if(!this.crash){
             this.crash = true;
-            this.MyLog += " {CRASH}";
-            System.out.println(getSelf().path().name() +" Crash");
+            this.MyLog += " {SELF CRASH}\n";
+            // System.out.println(getSelf().path().name() +" Crash");
         }else {
-            this.L1 = this.OldL1;
+            this.parent = this.L1;
             this.crash = false;
             this.sent = false;
             this.Ldata.clear();
             this.continer.clear();
             try { Thread.sleep(rnd.nextInt(200)+300); }
             catch (InterruptedException e) { e.printStackTrace(); }
-            this.MyLog += " {BACK}";
+            this.MyLog += " {RECOVER} \n";
         }
     }
-
-
 }

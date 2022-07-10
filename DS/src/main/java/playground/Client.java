@@ -13,14 +13,13 @@ import java.util.concurrent.TimeUnit;
 
 public class Client extends AbstractActor {
 
-    private String MyLog;
-    private Boolean sent;
-    private List<ActorRef> L2Crefs;
-    private final int id;
+    private final int id;                           // permanant id for visit
+    private List<ActorRef> L2Crefs;                 // parent list, one client will have several L2 parents
+    private List<Message> continer;                 // queue for received messages
+    private Boolean sent;                           // is processing sent requirements
+    
     private Random rnd = new Random();
-
-    private List<Message> continer;
-
+    private String myLog;
     private int waitingTime;
     private Object lastMessage;
     private boolean timeoutSend;
@@ -28,61 +27,62 @@ public class Client extends AbstractActor {
     public Client(List<ActorRef> receiverActors, int id) {
         this.L2Crefs = receiverActors;
         this.id = id;
-        this.MyLog = getSelf().path().name() + ": ";
+        this.myLog = getSelf().path().name() + ": \n";
         this.continer = new ArrayList<>();
         this.sent = false;
         this.waitingTime = 2000;
         this.lastMessage = null;
         this.timeoutSend = false;
-
     }
 
     private void sendReadMessage(Message.READ msg){
         this.sent = true;
         msg.L2.tell(msg, getSelf());
-        this.MyLog = this.MyLog + " {R "+msg.key+">"+msg.L2.path().name()+"}";
+        this.myLog = this.myLog + " {READ VALUE OF KEY: " + msg.key + " FROM " + msg.L2.path().name()+"}\n";
         this.lastMessage = msg;
-        try { Thread.sleep(rnd.nextInt(10)); }
+        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds        
         catch (InterruptedException e) { e.printStackTrace(); }
     }
 
     private void sendWriteMessage(Message.WRITE msg){
         this.sent = true;
         msg.L2.tell(msg, getSelf());
-        this.MyLog = this.MyLog + " {W ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.myLog = this.myLog + " {WRITE ("+msg.key+","+msg.value+") TO "+msg.L2.path().name()+"}\n";
         this.lastMessage = msg;
-        try { Thread.sleep(rnd.nextInt(10)); }
+        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds  
         catch (InterruptedException e) { e.printStackTrace(); }
     }
 
     private void sendCReadMessage(Message.CREAD msg){
         this.sent = true;
         msg.L2.tell(msg, getSelf());
-        this.MyLog = this.MyLog + " {CR "+msg.key+">"+msg.L2.path().name()+"}";
+        this.myLog = this.myLog + " {CRITICAL READ VALUE OF KEY: " + msg.key + " FROM " + msg.L2.path().name()+"}\n";
         this.lastMessage = msg;
-        try { Thread.sleep(rnd.nextInt(10)); }
+        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds 
         catch (InterruptedException e) { e.printStackTrace(); }
     }
     private void sendCWriteMessage(Message.CWRITE msg){
         this.sent = true;
         msg.L2.tell(msg, getSelf());
-        this.MyLog = this.MyLog + " {CW ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.myLog = this.myLog + " {CRITICAL WRITE ("+msg.key+","+msg.value+") TO "+ msg.L2.path().name()+"}\n";
         this.lastMessage = msg;
-        try { Thread.sleep(rnd.nextInt(10)); }
+        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds 
         catch (InterruptedException e) { e.printStackTrace(); }
     }
     
-
     static public Props props(List<ActorRef> receiverActor, int id) {
         return Props.create(Client.class, () -> new Client(receiverActor, id));
     }
+
     private void ReadHandeler(Message.READ msg){
-        if(msg.forward){
+        // check the direction of the msg(forward to db or backward to client)
+        if(msg.forward){                            
+            // if is sending message now or timeout, just add to container
             if(this.sent || this.timeoutSend){
                 this.continer.add(msg);
-            }
-            else {
-                msg.L2 = chooseL2();
+            }   
+            else {                                  
+                msg.L2 = chooseL2();                // set the target parent of the message    
                 sendReadMessage(msg);
                 setTimeout(this.waitingTime, msg);
             }
@@ -92,12 +92,14 @@ public class Client extends AbstractActor {
     }
 
     private void WriteHandeler(Message.WRITE msg){
+        // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
+            // if is sending message now or timeout, just add to container
             if(this.sent || this.timeoutSend){
                 this.continer.add(msg);
             }
             else {
-                msg.L2 = chooseL2();
+                msg.L2 = chooseL2();                // set the target parent of the message  
                 sendWriteMessage(msg);
                 setTimeout(this.waitingTime, msg);}
         }else {
@@ -106,12 +108,14 @@ public class Client extends AbstractActor {
     }
 
     private void CReadHandeler(Message.CREAD msg) {
+        // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
+            // if is sending message now or timeout, just add to container
             if(this.sent || this.timeoutSend){
                 this.continer.add(msg);
             }
             else {
-                msg.L2 = chooseL2();
+                msg.L2 = chooseL2();                // set the target parent of the message 
                 sendCReadMessage(msg);
                 setTimeout(this.waitingTime, msg);}
         }else {
@@ -120,12 +124,14 @@ public class Client extends AbstractActor {
     }
 
     private void CWriteHandeler(Message.CWRITE msg) {
+        // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
+            // if is sending message now or timeout, just add to container
             if(this.sent || this.timeoutSend){
                 this.continer.add(msg);
             }
             else {
-                msg.L2 = chooseL2();
+                msg.L2 = chooseL2();                // set the target parent of the message
                 sendCWriteMessage(msg);
                 setTimeout(this.waitingTime, msg);}
         }else {
@@ -134,29 +140,29 @@ public class Client extends AbstractActor {
     }
 
     private void receiveRead(Message.READ msg){
-        this.MyLog = this.MyLog + " {GR ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.myLog = this.myLog + " {GET READ RESULT ("+msg.key+","+msg.value+") FROM "+ msg.L2.path().name() + "}\n";
         this.sent = false;
-//        if(!this.continer.isEmpty()){this.nextMessage();}
     }
+
     private void receiveWrite(Message.WRITE msg){
-        this.MyLog = this.MyLog + " {GW ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.myLog = this.myLog + " {GET WRITE CERTIFICATE ("+msg.key+","+msg.value+") FROM" + msg.L2.path().name() + "}\n";
         this.sent = false;
-//        if(!this.continer.isEmpty()){this.nextMessage();}
     }
+
     private void receiveCRead(Message.CREAD msg){
-        this.MyLog = this.MyLog + " {GCR ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.myLog = this.myLog + " {GET CRITICAL READ RESULT ("+msg.key+","+msg.value+") FROM "+msg.L2.path().name()+"}\n";
         this.sent = false;
-//        if(!this.continer.isEmpty()){this.nextMessage();}
     }
+
     private void receiveCWrite(Message.CWRITE msg) {
-        this.MyLog = this.MyLog + " {GCW ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+        this.myLog = this.myLog + " {GET CRITICAL WRITE CERTIFICATE ("+msg.key+","+msg.value+") FROM"+msg.L2.path().name()+"}\n";
         this.sent = false;
-//        if(!this.continer.isEmpty()){this.nextMessage();}
     }
 
     private void printLog(){
-        System.out.println(this.MyLog);
+        System.out.println(this.myLog);
     }
+
     private void nextMessage(){
         Object msg = this.continer.get(0);
         continer.remove(0);
@@ -183,63 +189,42 @@ public class Client extends AbstractActor {
 
     private void timeOutCheck() {
         if(this.sent){
-            System.out.println(getSelf().path().name()+" shit, someone crashed!!" );
             crashHandler();
         }else {
             this.timeoutSend = false;
             if(!this.continer.isEmpty()){this.nextMessage();}
-
         }
     }
 
     private void crashHandler() {
-        this.MyLog = this.MyLog + " {Parent crashed} ";
-
-
-        if (this.lastMessage.getClass().equals(Message.READ.class)){//Message.READ.class.equals(s.getClass())) {
-            Message.READ msg;
-            msg = (Message.READ) this.lastMessage;
-            System.out.println(msg.key +" "+ msg.L2.path().name());
+        if (this.lastMessage.getClass().equals(Message.READ.class)){
+            Message.READ msg = (Message.READ) this.lastMessage;
+            this.myLog = this.myLog + " Parent crash detected from READ key "+ msg.key +" from "+ msg.L2.path().name();
             msg.L2 = chooseNewL2(msg.L2);
+            this.myLog = this.myLog + ", redirect parent to " + msg.L2.path().name() + "\n";
             sendReadMessage(msg);
             setTimeout(this.waitingTime,msg);
-
-
-        } else if (this.lastMessage.getClass().equals(Message.WRITE.class)){//Message.WRITE.class.equals(s.getClass())) {
-            Message.WRITE msg;
-            msg = (Message.WRITE) this.lastMessage;
-            System.out.println(msg.key +" "+ msg.L2.path().name());
+        } else if (this.lastMessage.getClass().equals(Message.WRITE.class)){
+            Message.WRITE msg = (Message.WRITE) this.lastMessage;
+            this.myLog = this.myLog + " Parent crash detected from WRITE key "+ msg.key +" to "+ msg.L2.path().name();
             msg.L2 = chooseNewL2(msg.L2);
+            this.myLog = this.myLog + ", redirect parent to " + msg.L2.path().name() + "\n";
             sendWriteMessage(msg);
             setTimeout(this.waitingTime,msg);
-
-//            ((Message.WRITE) s).L2 = chooseNewL2(((Message.WRITE) s).L2);
-//            sendWriteMessage((Message.WRITE) s);
-//            setTimeout(this.waitingTime,s);
-
-        } else if (this.lastMessage.getClass().equals(Message.CREAD.class)){//Message.CREAD.class.equals(s.getClass())) {
-            Message.CREAD msg;
-            msg = (Message.CREAD) this.lastMessage;
-            System.out.println(msg.key +" "+ msg.L2.path().name());
+        } else if (this.lastMessage.getClass().equals(Message.CREAD.class)){
+            Message.CREAD msg = (Message.CREAD) this.lastMessage;
+            this.myLog = this.myLog + " Parent crash detected from CREAD key"+ msg.key +" from "+ msg.L2.path().name();
             msg.L2 = chooseNewL2(msg.L2);
+            this.myLog = this.myLog + ", redirect parent to " + msg.L2.path().name() + "\n";
             sendCReadMessage(msg);
             setTimeout(this.waitingTime,msg);
-
-//            ((Message.CREAD) s).L2 = chooseNewL2(((Message.CREAD) s).L2);
-//            sendCReadMessage((Message.CREAD) s);
-//            setTimeout(this.waitingTime,s);
-
-        } else if (this.lastMessage.getClass().equals(Message.CWRITE.class)){//Message.CWRITE.class.equals(s.getClass())) {
-            Message.CWRITE msg;
-            msg = (Message.CWRITE) this.lastMessage;
-            System.out.println(msg.key +" "+ msg.L2.path().name());
+        } else if (this.lastMessage.getClass().equals(Message.CWRITE.class)){
+            Message.CWRITE msg = (Message.CWRITE) this.lastMessage;
+            this.myLog = this.myLog + " Parent crash detected from CWRITE key"+ msg.key +" to "+ msg.L2.path().name();
             msg.L2 = chooseNewL2(msg.L2);
+            this.myLog = this.myLog + ", redirect parent to " + msg.L2.path().name() + "\n";
             sendCWriteMessage(msg);
             setTimeout(this.waitingTime,msg);
-
-//            ((Message.CWRITE) s).L2 = chooseNewL2(((Message.CWRITE) s).L2);
-//            sendCWriteMessage((Message.CWRITE) s);
-//            setTimeout(this.waitingTime, s);
         }
     }
 
@@ -252,11 +237,15 @@ public class Client extends AbstractActor {
                 getContext().system().dispatcher(), getSelf()
         );
     }
+
+    // randomly chose a L2 Cache from parent list
     private ActorRef chooseL2(){
         int indx = ThreadLocalRandom.current().nextInt(this.L2Crefs.toArray().length);
-        ActorRef L2 =  this.L2Crefs.get(indx);
+        ActorRef L2 = this.L2Crefs.get(indx);
         return L2;
     }
+
+    // chose a new parent from valid parent list
     private ActorRef chooseNewL2(ActorRef l2){
         int indx = ThreadLocalRandom.current().nextInt(this.L2Crefs.toArray().length);
         ActorRef newL2 = this.L2Crefs.get(indx);
@@ -266,5 +255,4 @@ public class Client extends AbstractActor {
         }
         return newL2;
     }
-
 }

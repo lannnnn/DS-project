@@ -9,38 +9,36 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class L1C extends AbstractActor {
-    private Random rnd = new Random();
-    private List<ActorRef> L2s = new ArrayList<>();
+    private final int id;                                                  // permanant id for visit
+    private ActorRef parent;                                               // parent, database 
+    private List<ActorRef> L2s = new ArrayList<>();                        // child nodes    
+    private List<ActorRef> childrenDontKnowImBack;              
 
-    private ActorRef parent;
-    private final int id;
     private HashMap<String, String> Ldata = new HashMap<String, String>();
-    private boolean cw_waiting;
     private List<Message> continer;
+    private boolean cw_waiting;
+    private int waitingTime;
     private boolean sent;
     private String MyLog;
-    private int child_counter;
     private String check_state;
-    private Boolean state;
+    private Boolean state;                                                 // state used for critical write
     private Boolean crash;
-    private List<ActorRef> childrenDontKnowImBack;
-    private int waitingTime;
-    private int counter;
-
+    private int counter;                                                   // when come back, count the number of attempt to send msg to child(try 3 times here)
+    private int child_counter;                                             // count the certificate number from child node for critical write
+    private Random rnd = new Random();
 
     public L1C(ActorRef receiverActor, int id) {
-        this.parent = receiverActor;
         this.id = id;
+        this.parent = receiverActor;
         this.tell_your_parent(this.parent);
         this.cw_waiting = false;
-        this.MyLog = getSelf().path().name() + ": ";
+        this.MyLog = getSelf().path().name() + ":\n";
         this.sent = false;
         this.continer = new ArrayList<>();
         this.crash = false;
         this.childrenDontKnowImBack = new ArrayList<>();
-        this.waitingTime =  250;
+        this.waitingTime = 250;
         this.counter = 0;
-
     }
 
     private void tell_your_parent(ActorRef receiver){
@@ -48,30 +46,32 @@ public class L1C extends AbstractActor {
     }
 
     private void read(Message.READ msg){
+        // check state, if crashed, do nothing
         if(!this.crash){
+            // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
+                // if is sending message now, just add to container
                 if(this.sent){
                     this.continer.add(msg);
                 }else {
+                    // if have the key, return the value, else forward to parent
                     if(this.Ldata.containsKey(msg.key)) {
                         msg.value = this.Ldata.get(msg.key);
                         msg.forward = false;
-                        this.MyLog = this.MyLog + " {"+ msg.L2.path().name()+" LR "+msg.value+"}";
+                        this.MyLog = this.MyLog + " {READ EQURE FROM "+ msg.L2.path().name()+" FINISHED WITH VALUE ("+msg.key+","+msg.value+")}\n";
                         this.sendMessageR(msg,msg.L2);
-
                     }else {
                         msg.L1 = getSelf();
                         this.sent = true;
-                        this.MyLog = this.MyLog + " {SR "+ msg.L2.path().name()+" "+ msg.key +"> "+this.parent.path().name()+"}";
+                        this.MyLog = this.MyLog + " {FORWARD READ REQ "+ msg.key +" FROM "+ msg.L2.path().name()+" TO "+this.parent.path().name()+"}\n";
                         this.sendMessageR(msg,this.parent);
                     }
                 }
-
             }else {
-
-                this.Ldata.put(msg.key, msg.value);
+                this.Ldata.put(msg.key, msg.value);  // update the data table
+                this.MyLog = this.MyLog + " {INSERT DATA ("+msg.key+","+msg.value+")}\n";
                 this.sent = false;
-                this.MyLog = this.MyLog + " {GR "+getSender().path().name()+" ("+ msg.key+","+ msg.value+")> "+msg.L2.path().name()+"}";
+                this.MyLog = this.MyLog + " {BACKWORD READ REQ FROM "+getSender().path().name()+" ("+ msg.key+","+ msg.value+") TO "+msg.L2.path().name()+"}";
                 this.sendMessageR(msg,msg.L2);
                 if(!this.continer.isEmpty()){this.nextMessage();}
             }
@@ -80,24 +80,25 @@ public class L1C extends AbstractActor {
     }
 
     private void write(Message.WRITE msg){
+        // check state, if crashed, do nothing
         if(!this.crash){
+            // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
+                // if is sending message now or timeout, just add to container
                 if(this.sent){
                     this.continer.add(msg);
                 }else {
                     this.sent = true;
                     msg.L1 = getSelf();
-                    this.MyLog = this.MyLog + " {SW " + getSender().path().name()+ "(" +msg.key+","+msg.value+")>"+this.parent.path().name()+"}";
+                    this.MyLog = this.MyLog + " {SEND WRITE REQ("+msg.key+","+msg.value+") FROM " +getSender().path().name() + " TO "+ this.parent.path().name() +"}\n";
                     sendMessageW(msg, this.parent);
                 }
-
             } else {
-                if(this.Ldata.containsKey(msg.key)) {
-                    this.Ldata.put(msg.key, msg.value);
-                    this.MyLog = this.MyLog + "{newData ("+msg.key+","+msg.value+")"+getSender().path().name()+" }";
-
+                if(this.Ldata.containsKey(msg.key)) {         // only the cache contain the data updated
+                    this.Ldata.put(msg.key, msg.value);       // update the data table
+                    this.MyLog = this.MyLog + " {UPDATE DATA ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+"}\n";
                 }
-//                System.out.println(findDifference(this.L2s,this.childrenDontKnowImBack).toArray().length + " ___________ "+ this.L2s.toArray().length);
+                // System.out.println(findDifference(this.L2s,this.childrenDontKnowImBack).toArray().length + " ___________ "+ this.L2s.toArray().length);
                 List<ActorRef> childrenKnowImBack = new ArrayList<>(findDifference(this.L2s, this.childrenDontKnowImBack));
 
                 for(int i = 0; i < childrenKnowImBack.toArray().length; i++){
@@ -105,31 +106,31 @@ public class L1C extends AbstractActor {
                 }
                 if(msg.L1 == getSelf()){
                     this.sent = false;
-                    this.MyLog = this.MyLog + " {GW "+ getSender().path().name()+" ("+msg.key+","+msg.value+")>"+msg.L2.path().name()+"}";
+                    this.MyLog = this.MyLog + " {BACKWORD WRITE CERTIFICATION ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+" TO "+msg.L2.path().name()+"}\n";
                     if(!this.continer.isEmpty()){this.nextMessage();}
                 }
             }
-        }else {
-
         }
     }
 
     private void cread(Message.CREAD msg){
+        // check state, if crashed, do nothing
         if(!this.crash){
+            // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
+                // if is sending message now or timeout, just add to container
                 if(this.sent){
                     this.continer.add(msg);
-
                 }else {
                     msg.L1 = getSelf();
                     this.sent = true;
-                    this.MyLog = this.MyLog + " {SCR "+ msg.L2.path().name()+" "+ msg.key +"> "+this.parent.path().name()+"}";
+                    this.MyLog = this.MyLog + " {FORWARD CRITICAL READ REQ "+ msg.key +"FROM "+ msg.L2.path().name()+" TO "+this.parent.path().name()+"}\n";
                     this.sendMessageCR(msg,this.parent);
                 }
             }else {
-                this.Ldata.put(msg.key, msg.value);
+                this.Ldata.put(msg.key, msg.value);     // update the data table
                 this.sent = false;
-                this.MyLog = this.MyLog + " {GCR "+getSender().path().name()+" ("+ msg.key+","+ msg.value+")> "+msg.L2.path().name()+"}";
+                this.MyLog = this.MyLog + " {BACKWORD CRITICAL READ REQ FROM "+getSender().path().name()+" ("+ msg.key+","+ msg.value+") TO "+msg.L2.path().name()+"}\n";
                 this.sendMessageCR(msg,msg.L2);
 //                if(!this.continer.isEmpty()){this.nextMessage();}
             }
@@ -138,6 +139,9 @@ public class L1C extends AbstractActor {
 
     private void cwrite(Message.CWRITE s){
         this.cw_waiting = true;
+
+        // checking
+
         System.out.println(getSelf().path().name()+": shit!!!");
     }
 
@@ -178,30 +182,28 @@ public class L1C extends AbstractActor {
     }
 
     private void checking(Message.CW_check s) {
-        // pause evrything
+        // pause evrything (is it really needed?)
         // if !forward
         if(!s.forward){
             if(s.A){
                 //un pause! :))
             }
-            // send to childs
+
             child_counter = 0;
             for(int i = 0; i < L2s.toArray().length; i++){
                 L2s.get(i).tell(s,getSelf());
             }
             //if forward
         }else {
+        // ask children to clear the data 
+        // add a function to receive the clear certification from child
+        // everytime receive the certification, check the count
+        // if count(certificate + crash == all child) call another function to change the state
             child_counter++;
             if (s.A){
                 this.parent.tell(s,getSelf());
             }
-
         }
-
-        //if counting is same as childs
-        //set state
-        //change the P,R C?
-        // send to parent
     }
 
     public void addingChild(ActorRef receiver){
@@ -213,7 +215,7 @@ public class L1C extends AbstractActor {
     }
     private void printLog(){
         System.out.println(this.MyLog);
-        System.out.println(getSelf().path().name()+": "+this.Ldata);
+        System.out.println(getSelf().path().name()+" data table: "+this.Ldata);
     }
     @Override
     public Receive createReceive() {
@@ -235,14 +237,14 @@ public class L1C extends AbstractActor {
     private void onCrash() {
         if(!this.crash){
             this.crash = true;
-            this.MyLog += " {CRASH}";
+            this.MyLog += " {SELF CRASH}\n";
         }else {
             this.crash = false;
             this.Ldata.clear();
             this.continer.clear();
             try { Thread.sleep(rnd.nextInt(100)+250); }
             catch (InterruptedException e) { e.printStackTrace(); }
-            this.MyLog += " {BACK}";
+            this.MyLog += " {RECOVER}\n";
             // tell your childs that you are alive!!
             this.childrenDontKnowImBack = this.L2s;
             tellChildren();
@@ -250,7 +252,6 @@ public class L1C extends AbstractActor {
     }
 
     private void tellChildren() {
-
         for(int i = 0; i < this.childrenDontKnowImBack.toArray().length; i++){
             Message.ImBack msg = new Message.ImBack(getSelf(), null);
             childrenDontKnowImBack.get(i).tell(msg, getSelf());
@@ -273,7 +274,7 @@ public class L1C extends AbstractActor {
             tellChildren();
             this.counter++;
         }
-        this.MyLog += " {Almost children know!}";
+        this.MyLog += " {Almost children know!}\n";
     }
 
     private static <T> Set<T> findDifference(List<T> first, List<T> second)
@@ -282,8 +283,4 @@ public class L1C extends AbstractActor {
         diff.removeAll(second);
         return diff;
     }
-
-
-
-
 }
