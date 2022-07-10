@@ -80,9 +80,9 @@ public class L2C extends AbstractActor {
                         this.sendMessageR(msg,msg.c);
                     }else {
                         msg.L2 = getSelf();
-                        this.sent.add(true);
                         this.MyLog = this.MyLog + " {FORWARD READ REQ "+ msg.key +" FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";
                         this.lastMessage = msg;
+                        this.sent.add(true);
                         this.sendMessageR((Message.READ) this.lastMessage,this.parent);
                         setTimeout(this.waitingTime);
                     }
@@ -112,9 +112,9 @@ public class L2C extends AbstractActor {
                 if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                     this.continer.add(msg);
                 }else {
-                    this.sent.add(true);
                     msg.L2 = getSelf();
                     this.MyLog = this.MyLog + " {SEND WRITE REQ("+msg.key+","+msg.value+") FROM " +getSender().path().name() + " TO "+ this.parent.path().name() +"}\n";
+                    this.sent.add(true);
                     sendMessageW(msg, this.parent);
                     this.lastMessage = msg;
                     setTimeout(this.waitingTime);
@@ -274,21 +274,21 @@ public class L2C extends AbstractActor {
             ((Message.READ) msg).L1 = this.parent;
             this.MyLog = this.MyLog + " {RE-FORWARD READ REQ "+ ((Message.READ) msg).key +" FROM "+ ((Message.READ) msg).c.path().name()+" TO "+this.parent.path().name()+"}\n";
             sendMessageR((Message.READ) msg, ((Message.READ) msg).L1);
-            setTimeout(this.waitingTime);
         } else if (Message.WRITE.class.equals(msg.getClass())) {
             this.MyLog = this.MyLog + " {RE-SEND WRITE REQ("+((Message.WRITE) msg).key+","+((Message.WRITE) msg).value+") TO "+ this.parent.path().name() +"}\n";
             ((Message.WRITE) msg).L1 = this.parent;
             sendMessageW((Message.WRITE) msg, ((Message.WRITE) msg).L1);
-            setTimeout(this.waitingTime);
         } else if (Message.CREAD.class.equals(msg.getClass())) {
             this.MyLog = this.MyLog + " {RE-FORWARD CRITICAL READ REQ "+ ((Message.CREAD) msg).key +"FROM "+((Message.CREAD) msg).c.path().name()+" TO "+this.parent.path().name()+"}\n";
             ((Message.CREAD) msg).L1 = this.parent;
             sendMessageCR((Message.CREAD) msg, ((Message.CREAD) msg).L1);
-            setTimeout(this.waitingTime);
         } else if (Message.CWRITE.class.equals(msg.getClass())) {
             sendMessageCW((Message.CWRITE) msg, this.parent);
-            setTimeout(this.waitingTime);
+        } else {
+            return; //something goes wrong
         }
+        this.sent.add(true);
+        setTimeout(this.waitingTime);
     }
 
     private void onCrash() {
