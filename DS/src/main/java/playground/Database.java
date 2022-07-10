@@ -44,7 +44,7 @@ public class Database extends AbstractActor {
         }else {
             msg.value = this.data.get(msg.key);
             msg.forward = false;
-            Mylog += " {READ EQURE FROM "+ getSender().path().name() +" FINISHED WITH VALUE ("+msg.key+","+msg.value+")}\n";
+            Mylog += " {READ REQURE FROM "+ getSender().path().name() +" FINISHED WITH VALUE ("+msg.key+","+msg.value+")}\n";
             getSender().tell(msg, getSelf());
             try { Thread.sleep(rnd.nextInt(20)); }
             catch (InterruptedException e) { e.printStackTrace(); }

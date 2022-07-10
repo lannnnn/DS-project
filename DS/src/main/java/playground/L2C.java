@@ -25,7 +25,7 @@ public class L2C extends AbstractActor {
     private int waitingTime;
     private boolean cw_waiting;
     private Boolean crash;
-    private boolean sent;
+    private List<Boolean> sent;                                            // processing state for sent requirements
     private Object lastMessage;
     private boolean timeoutSend;
     private String MyLog;
@@ -41,7 +41,7 @@ public class L2C extends AbstractActor {
         this.tell_your_parent(this.parent);
         this.cw_waiting = false;
         this.MyLog = getSelf().path().name() + ":\n";
-        this.sent = false;
+        this.sent = new ArrayList<>();
         this.timeoutSend = false;
         this.continer = new ArrayList<>();
         this.crash = false;
@@ -68,8 +68,8 @@ public class L2C extends AbstractActor {
         if(!this.crash){
             // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
-                // if is sending message now or timeout, just add to container
-                if(this.sent || this.timeoutSend){
+                // if is sending message now, just add to container
+                if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                     this.continer.add(msg);
                 }else {
                     // if have the key, return the value, else forward to parent
@@ -80,7 +80,7 @@ public class L2C extends AbstractActor {
                         this.sendMessageR(msg,msg.c);
                     }else {
                         msg.L2 = getSelf();
-                        this.sent = true;
+                        this.sent.add(true);
                         this.MyLog = this.MyLog + " {FORWARD READ REQ "+ msg.key +" FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";
                         this.lastMessage = msg;
                         this.sendMessageR((Message.READ) this.lastMessage,this.parent);
@@ -90,7 +90,13 @@ public class L2C extends AbstractActor {
             }else {
                 this.Ldata.put(msg.key, msg.value);    // update the data table
                 this.MyLog = this.MyLog + " {UPDATE DATA ("+msg.key+","+msg.value+")}\n";
-                this.sent = false;
+                // change the first true to false
+                for(int i=0; i<this.sent.toArray().length; i++) {
+                    if(this.sent.get(i)){
+                        this.sent.set(i,false);
+                        break;
+                    }
+                }
                 this.MyLog = this.MyLog + " {BACKWORD READ REQ FROM "+getSender().path().name()+" ("+ msg.key+","+ msg.value+") TO "+msg.c.path().name()+"}\n";
                 this.sendMessageR(msg,msg.c);
             }
@@ -102,11 +108,11 @@ public class L2C extends AbstractActor {
         if(!this.crash){
             // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
-                // if is sending message now or timeout, just add to container
-                if(this.sent || this.timeoutSend){
+                // if is sending message now, just add to container
+                if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                     this.continer.add(msg);
                 }else {
-                    this.sent = true;
+                    this.sent.add(true);
                     msg.L2 = getSelf();
                     this.MyLog = this.MyLog + " {SEND WRITE REQ("+msg.key+","+msg.value+") FROM " +getSender().path().name() + " TO "+ this.parent.path().name() +"}\n";
                     sendMessageW(msg, this.parent);
@@ -119,7 +125,13 @@ public class L2C extends AbstractActor {
                     this.MyLog = this.MyLog + " {UPDATE DATA ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+"}\n";
                 }
                 if(msg.L2 == getSelf()){
-                    this.sent = false;
+                    // change the first true to false
+                    for(int i=0; i<this.sent.toArray().length; i++) {
+                        if(this.sent.get(i)){
+                            this.sent.set(i,false);
+                            break;
+                        }
+                    }
                     this.MyLog = this.MyLog + " {BACKWORD WRITE CERTIFICATION ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+" TO "+msg.c.path().name()+"}\n";
                     this.sendMessageW(msg,msg.c);
                 }
@@ -134,12 +146,12 @@ public class L2C extends AbstractActor {
             // check the direction of the msg(forward to db or backward to client)
             // goto database anyway
             if(msg.forward){
-                // if is sending message now or timeout, just add to container
-                if(this.sent || this.timeoutSend){
+                // if is sending message now, just add to container
+                if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                     this.continer.add(msg);
                 }else {
                     msg.L2 = getSelf();
-                    this.sent = true;
+                    this.sent.add(true);
                     this.MyLog = this.MyLog + " {FORWARD CRITICAL READ REQ "+ msg.key +"FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";
                     this.sendMessageCR(msg,this.parent);
                     this.lastMessage = msg;
@@ -147,7 +159,13 @@ public class L2C extends AbstractActor {
                 }
             }else {
                 this.Ldata.put(msg.key, msg.value);  // update the data table
-                this.sent = false;
+                // change the first true to false
+                for(int i=0; i<this.sent.toArray().length; i++) {
+                    if(this.sent.get(i)){
+                        this.sent.set(i,false);
+                        break;
+                    }
+                }
                 this.MyLog = this.MyLog + " {BACKWORD CRITICAL READ REQ FROM "+getSender().path().name()+" ("+ msg.key+","+ msg.value+") TO "+msg.c.path().name()+"}\n";
                 this.sendMessageCR(msg,msg.c);
 
@@ -157,7 +175,7 @@ public class L2C extends AbstractActor {
 
     private void cwrite(Message.CWRITE s){
         System.out.println(getSelf().path().name()+": shit!!!");
-        this.sent = true;
+        this.sent.add(true);
 
     }
 
@@ -236,17 +254,20 @@ public class L2C extends AbstractActor {
     }
 
     private void timeOutCheck() {
-        if(this.sent){
+         if(!this.sent.isEmpty() && this.sent.get(0)){
+            this.sent.remove(0);
             crashHandler();
         }else {
-            this.timeoutSend = false;
+            if(!this.sent.isEmpty()) {
+                this.sent.remove(0);
+            }
             if(!this.continer.isEmpty()){this.nextMessage();}
         }
     }
 
     private void crashHandler() {
         if(this.crash) return;
-        MyLog += this.parent.path().name() + " crash detected, resend the request\n";
+        MyLog += " [CRASH!] " + this.parent.path().name() + " crash/timeout detected, resend the request\n";
         this.parent = this.databaseRef;
         Object msg = this.lastMessage;
         if (Message.READ.class.equals(msg.getClass())) {
@@ -279,7 +300,7 @@ public class L2C extends AbstractActor {
         }else {
             this.parent = this.L1;
             this.crash = false;
-            this.sent = false;
+            this.sent.clear();
             this.Ldata.clear();
             this.continer.clear();
             try { Thread.sleep(rnd.nextInt(200)+300); }
