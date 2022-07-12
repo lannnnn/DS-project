@@ -104,11 +104,9 @@ public class L1C extends AbstractActor {
                 for(int i = 0; i < childrenKnowImBack.toArray().length; i++){
                     childrenKnowImBack.get(i).tell(msg,getSelf());
                 }
-                if(msg.L1 == getSelf()){
-                    this.sent = false;
-                    this.MyLog = this.MyLog + " {BACKWORD WRITE CERTIFICATION ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+" TO "+msg.L2.path().name()+"}\n";
-                    if(!this.continer.isEmpty()){this.nextMessage();}
-                }
+                this.sent = false;
+                this.MyLog = this.MyLog + " {BACKWORD WRITE CERTIFICATION ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+" TO "+msg.L2.path().name()+"}\n";
+                if(!this.continer.isEmpty()){this.nextMessage();}
             }
         }
     }

@@ -90,13 +90,8 @@ public class L2C extends AbstractActor {
             }else {
                 this.Ldata.put(msg.key, msg.value);    // update the data table
                 this.MyLog = this.MyLog + " {UPDATE DATA ("+msg.key+","+msg.value+")}\n";
-                // change the first true to false
-                for(int i=0; i<this.sent.toArray().length; i++) {
-                    if(this.sent.get(i)){
-                        this.sent.set(i,false);
-                        break;
-                    }
-                }
+                // change the first true(in design, always the last element)  to false
+                if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
                 this.MyLog = this.MyLog + " {BACKWORD READ REQ FROM "+getSender().path().name()+" ("+ msg.key+","+ msg.value+") TO "+msg.c.path().name()+"}\n";
                 this.sendMessageR(msg,msg.c);
             }
@@ -124,18 +119,10 @@ public class L2C extends AbstractActor {
                     this.Ldata.put(msg.key, msg.value);     // update the data table
                     this.MyLog = this.MyLog + " {UPDATE DATA ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+"}\n";
                 }
-                if(msg.L2 == getSelf()){
-                    // change the first true to false
-                    for(int i=0; i<this.sent.toArray().length; i++) {
-                        if(this.sent.get(i)){
-                            this.sent.set(i,false);
-                            break;
-                        }
-                    }
-                    this.MyLog = this.MyLog + " {BACKWORD WRITE CERTIFICATION ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+" TO "+msg.c.path().name()+"}\n";
-                    this.sendMessageW(msg,msg.c);
-                }
-
+                // change the first true(in design, always the last element) to false
+                if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
+                this.MyLog = this.MyLog + " {BACKWORD WRITE CERTIFICATION ("+msg.key+","+msg.value+") FROM "+getSender().path().name()+" TO "+msg.c.path().name()+"}\n";
+                this.sendMessageW(msg,msg.c);
             }
         }
     }
@@ -152,20 +139,15 @@ public class L2C extends AbstractActor {
                 }else {
                     msg.L2 = getSelf();
                     this.sent.add(true);
-                    this.MyLog = this.MyLog + " {FORWARD CRITICAL READ REQ "+ msg.key +"FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";
+                    this.MyLog = this.MyLog + " {FORWARD CRITICAL READ REQ "+ msg.key +" FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";
                     this.sendMessageCR(msg,this.parent);
                     this.lastMessage = msg;
                     setTimeout(this.waitingTime);
                 }
             }else {
                 this.Ldata.put(msg.key, msg.value);  // update the data table
-                // change the first true to false
-                for(int i=0; i<this.sent.toArray().length; i++) {
-                    if(this.sent.get(i)){
-                        this.sent.set(i,false);
-                        break;
-                    }
-                }
+                // change the first true(in design, always the last element)  to false
+                if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
                 this.MyLog = this.MyLog + " {BACKWORD CRITICAL READ REQ FROM "+getSender().path().name()+" ("+ msg.key+","+ msg.value+") TO "+msg.c.path().name()+"}\n";
                 this.sendMessageCR(msg,msg.c);
 
@@ -175,8 +157,8 @@ public class L2C extends AbstractActor {
 
     private void cwrite(Message.CWRITE s){
         System.out.println(getSelf().path().name()+": shit!!!");
-        this.sent.add(true);
-
+        // change the first true(in design, always the last element)  to false
+        if(!this.sent.isEmpty()) this.sent.add(true);
     }
 
     private void nextMessage(){

@@ -125,7 +125,7 @@ public class Client extends AbstractActor {
         // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
             // if is sending message now, just add to container
-            if(this.sent.toArray().length>0 && this.sent.get(this.sent.toArray().length-1)){
+            if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                 this.continer.add(msg);
             }
             else {
@@ -139,46 +139,50 @@ public class Client extends AbstractActor {
 
     private void receiveRead(Message.READ msg){
         this.myLog = this.myLog + " {GET READ RESULT ("+msg.key+","+msg.value+") FROM "+ msg.L2.path().name() + "}\n";
-        // change the first true to false
-        for(int i=0; i<this.sent.toArray().length; i++) {
-            if(this.sent.get(i)){
-                this.sent.set(i,false);
-                break;
-            }
-        }
+        // // change the first true to false
+        // for(int i=0; i<this.sent.toArray().length; i++) {
+        //     if(this.sent.get(i)){
+        //         this.sent.set(i,false);
+        //         break;
+        //     }
+        // }
+        if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
     }
 
     private void receiveWrite(Message.WRITE msg){
         this.myLog = this.myLog + " {GET WRITE CERTIFICATE ("+msg.key+","+msg.value+") FROM" + msg.L2.path().name() + "}\n";
-        // change the first true to false
-        for(int i=0; i<this.sent.toArray().length; i++) {
-            if(this.sent.get(i)){
-                this.sent.set(i,false);
-                break;
-            }
-        }
+        // // change the first true to false
+        // for(int i=0; i<this.sent.toArray().length; i++) {
+        //     if(this.sent.get(i)){
+        //         this.sent.set(i,false);
+        //         break;
+        //     }
+        // }
+        if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
     }
 
     private void receiveCRead(Message.CREAD msg){
         this.myLog = this.myLog + " {GET CRITICAL READ RESULT ("+msg.key+","+msg.value+") FROM "+msg.L2.path().name()+"}\n";
-        // change the first true to false
-        for(int i=0; i<this.sent.toArray().length; i++) {
-            if(this.sent.get(i)){
-                this.sent.set(i,false);
-                break;
-            }
-        }
+        // // change the first true to false
+        // for(int i=0; i<this.sent.toArray().length; i++) {
+        //     if(this.sent.get(i)){
+        //         this.sent.set(i,false);
+        //         break;
+        //     }
+        // }
+        if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
     }
 
     private void receiveCWrite(Message.CWRITE msg) {
         this.myLog = this.myLog + " {GET CRITICAL WRITE CERTIFICATE ("+msg.key+","+msg.value+") FROM"+msg.L2.path().name()+"}\n";
         // change the first true to false
-        for(int i=0; i<this.sent.toArray().length; i++) {
-            if(this.sent.get(i)){
-                this.sent.set(i,false);
-                break;
-            }
-        }
+        // for(int i=0; i<this.sent.toArray().length; i++) {
+        //     if(this.sent.get(i)){
+        //         this.sent.set(i,false);
+        //         break;
+        //     }
+        // }
+        if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
     }
 
     private void printLog(){
@@ -214,7 +218,7 @@ public class Client extends AbstractActor {
             crashHandler();
             this.sent.remove(0);
         }else {
-            if(!this.sent.isEmpty()) {
+            if(!this.sent.isEmpty() && !this.sent.get(0)) {
                 this.sent.remove(0);
             }
             if(!this.continer.isEmpty()){this.nextMessage();}
