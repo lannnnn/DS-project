@@ -2,6 +2,7 @@ package playground;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
+import akka.actor.Cancellable;
 import akka.actor.Props;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
@@ -16,71 +17,78 @@ public class Client extends AbstractActor {
     private final int id;                           // permanant id for visit
     private List<ActorRef> L2Crefs;                 // parent list, one client will have several L2 parents
     private List<Message> continer;                 // queue for received messages
-    private List<Boolean> sent;                     // processing state for sent requirements
-    
+    private Boolean Send;
     private Random rnd = new Random();
     private String myLog;
     private int waitingTime;
     private Object lastMessage;
+    private int lastMassegeId;
+    private Cancellable timer;
 
     public Client(List<ActorRef> receiverActors, int id) {
         this.L2Crefs = receiverActors;
         this.id = id;
         this.myLog = getSelf().path().name() + ": \n";
         this.continer = new ArrayList<>();
-        this.sent = new ArrayList<>();
-        this.waitingTime = 2000;
+        this.waitingTime = 1200;
         this.lastMessage = null;
+        this.Send = false;
+
+
     }
 
     private void sendReadMessage(Message.READ msg){
-        this.sent.add(true);
+        this.Send = true;
+        this.lastMassegeId = msg.id;
         msg.L2.tell(msg, getSelf());
         this.myLog = this.myLog + " {READ VALUE OF KEY: " + msg.key + " FROM " + msg.L2.path().name()+"}\n";
         this.lastMessage = msg;
-        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds        
+        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds
         catch (InterruptedException e) { e.printStackTrace(); }
     }
 
     private void sendWriteMessage(Message.WRITE msg){
-        this.sent.add(true);
+        this.Send = true;
+        this.lastMassegeId = msg.id;
         msg.L2.tell(msg, getSelf());
         this.myLog = this.myLog + " {WRITE ("+msg.key+","+msg.value+") TO "+msg.L2.path().name()+"}\n";
         this.lastMessage = msg;
-        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds  
+        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds
         catch (InterruptedException e) { e.printStackTrace(); }
     }
 
     private void sendCReadMessage(Message.CREAD msg){
-        this.sent.add(true);
+        this.Send = true;
+        this.lastMassegeId = msg.id;
         msg.L2.tell(msg, getSelf());
         this.myLog = this.myLog + " {CRITICAL READ VALUE OF KEY: " + msg.key + " FROM " + msg.L2.path().name()+"}\n";
         this.lastMessage = msg;
-        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds 
+        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds
         catch (InterruptedException e) { e.printStackTrace(); }
     }
     private void sendCWriteMessage(Message.CWRITE msg){
-        this.sent.add(true);
+        this.Send = true;
+        this.lastMassegeId = msg.id;
         msg.L2.tell(msg, getSelf());
         this.myLog = this.myLog + " {CRITICAL WRITE ("+msg.key+","+msg.value+") TO "+ msg.L2.path().name()+"}\n";
         this.lastMessage = msg;
-        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds 
+        try { Thread.sleep(rnd.nextInt(10)); }      // random sleep several seconds
         catch (InterruptedException e) { e.printStackTrace(); }
     }
-    
+
     static public Props props(List<ActorRef> receiverActor, int id) {
         return Props.create(Client.class, () -> new Client(receiverActor, id));
     }
 
     private void ReadHandeler(Message.READ msg){
         // check the direction of the msg(forward to db or backward to client)
-        if(msg.forward){                            
+        if(msg.forward){
             // if is sending message now, just add to container
-            if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+            if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                 this.continer.add(msg);
-            }   
-            else {                                  
-                msg.L2 = chooseL2();                // set the target parent of the message    
+            }
+            else {
+                msg.L2 = chooseL2();                // set the target parent of the message
                 sendReadMessage(msg);
                 setTimeout(this.waitingTime, msg);
             }
@@ -93,11 +101,11 @@ public class Client extends AbstractActor {
         // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
             // if is sending message now, just add to container
-            if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+            if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                 this.continer.add(msg);
             }
             else {
-                msg.L2 = chooseL2();                // set the target parent of the message  
+                msg.L2 = chooseL2();                // set the target parent of the message
                 sendWriteMessage(msg);
                 setTimeout(this.waitingTime, msg);}
         }else {
@@ -109,11 +117,11 @@ public class Client extends AbstractActor {
         // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
             // if is sending message now, just add to container
-            if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+            if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                 this.continer.add(msg);
             }
             else {
-                msg.L2 = chooseL2();                // set the target parent of the message 
+                msg.L2 = chooseL2();                // set the target parent of the message
                 sendCReadMessage(msg);
                 setTimeout(this.waitingTime, msg);}
         }else {
@@ -125,7 +133,7 @@ public class Client extends AbstractActor {
         // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
             // if is sending message now, just add to container
-            if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+            if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
                 this.continer.add(msg);
             }
             else {
@@ -139,50 +147,42 @@ public class Client extends AbstractActor {
 
     private void receiveRead(Message.READ msg){
         this.myLog = this.myLog + " {GET READ RESULT ("+msg.key+","+msg.value+") FROM "+ msg.L2.path().name() + "}\n";
-        // // change the first true to false
-        // for(int i=0; i<this.sent.toArray().length; i++) {
-        //     if(this.sent.get(i)){
-        //         this.sent.set(i,false);
-        //         break;
-        //     }
-        // }
-        if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
+        if(msg.id == this.lastMassegeId){
+            this.Send = false;
+            timer.cancel();
+            if(!this.continer.isEmpty()){ nextMessage();}
+        }
+
     }
 
     private void receiveWrite(Message.WRITE msg){
         this.myLog = this.myLog + " {GET WRITE CERTIFICATE ("+msg.key+","+msg.value+") FROM" + msg.L2.path().name() + "}\n";
-        // // change the first true to false
-        // for(int i=0; i<this.sent.toArray().length; i++) {
-        //     if(this.sent.get(i)){
-        //         this.sent.set(i,false);
-        //         break;
-        //     }
-        // }
-        if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
+
+        if(msg.id == this.lastMassegeId){
+            this.Send = false;
+            timer.cancel();
+            if(!this.continer.isEmpty()){ nextMessage();}
+        }
     }
 
     private void receiveCRead(Message.CREAD msg){
         this.myLog = this.myLog + " {GET CRITICAL READ RESULT ("+msg.key+","+msg.value+") FROM "+msg.L2.path().name()+"}\n";
-        // // change the first true to false
-        // for(int i=0; i<this.sent.toArray().length; i++) {
-        //     if(this.sent.get(i)){
-        //         this.sent.set(i,false);
-        //         break;
-        //     }
-        // }
-        if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
+
+        if(msg.id == this.lastMassegeId){
+            this.Send = false;
+            timer.cancel();
+            if(!this.continer.isEmpty()){ nextMessage();}
+        }
     }
 
     private void receiveCWrite(Message.CWRITE msg) {
-        this.myLog = this.myLog + " {GET CRITICAL WRITE CERTIFICATE ("+msg.key+","+msg.value+") FROM"+msg.L2.path().name()+"}\n";
-        // change the first true to false
-        // for(int i=0; i<this.sent.toArray().length; i++) {
-        //     if(this.sent.get(i)){
-        //         this.sent.set(i,false);
-        //         break;
-        //     }
-        // }
-        if(!this.sent.isEmpty()) this.sent.set(this.sent.toArray().length-1,false);
+        this.myLog = this.myLog + " {GET CRITICAL WRITE CERTIFICATE ("+msg.key+","+msg.value+") FROM "+msg.L2.path().name()+" "+ msg.done +"}\n";
+
+        if(msg.id == this.lastMassegeId){
+            this.Send = false;
+            timer.cancel();
+            if(!this.continer.isEmpty()){ nextMessage();}
+        }
     }
 
     private void printLog(){
@@ -198,6 +198,8 @@ public class Client extends AbstractActor {
             WriteHandeler((Message.WRITE) msg);
         } else if (msg.getClass() == Message.CREAD.class) {
             CReadHandeler((Message.CREAD) msg);
+        } else if (msg.getClass() == Message.CWRITE.class) {
+            CWriteHandeler((Message.CWRITE) msg);
         }
     }
 
@@ -208,22 +210,11 @@ public class Client extends AbstractActor {
                 .match(Message.CREAD.class, s -> CReadHandeler(s))
                 .match(Message.CWRITE.class, s -> CWriteHandeler(s))
                 .match(Message.printLogs.class, s -> printLog())
-                .match(Message.Timeout.class, s -> timeOutCheck())
+                .match(Message.Timeout.class, s -> crashHandler())
                 .build();
 
     }
 
-    private void timeOutCheck() {
-        if(!this.sent.isEmpty() && this.sent.get(0)){
-            crashHandler();
-            this.sent.remove(0);
-        }else {
-            if(!this.sent.isEmpty() && !this.sent.get(0)) {
-                this.sent.remove(0);
-            }
-            if(!this.continer.isEmpty()){this.nextMessage();}
-        }
-    }
 
     private void crashHandler() {
         if (this.lastMessage.getClass().equals(Message.READ.class)){
@@ -258,7 +249,7 @@ public class Client extends AbstractActor {
     }
 
     void setTimeout(int time, Object message) {
-        getContext().system().scheduler().scheduleOnce(
+        timer = getContext().system().scheduler().scheduleOnce(
                 Duration.create(time, TimeUnit.MILLISECONDS),
                 getSelf(),
                 new Message.Timeout(), // the message to send

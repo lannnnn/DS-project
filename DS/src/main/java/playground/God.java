@@ -22,22 +22,51 @@ public class God extends AbstractActor {
         // HI lets play a game
         System.out.println("Hi, I'm God!");
 
+
         // making task
 
-        List<Object> msg = this.generate_tasks(10,3, 5,L2cs);
+        List<Object> msg = this.generate_tasks(5,5, 5,5);
+
         System.out.println("God: generate "+ msg.toArray().length+ " tasks!");
+//        setTimeout(20,L1cs.get(0));
+//        setTimeout(25,L1cs.get(0));
+
+        Message.CWRITE cwmsg = new Message.CWRITE("5", "-50", Clients.get(0),null,null,true,0);
+        Message.CWRITE cwmsg1 = new Message.CWRITE("5", "-60", Clients.get(0),null,null,true,1);
+        Message.READ rmsg = new Message.READ("5", null,Clients.get(1), null,null,true,2);
+        Message.READ rmsg1 = new Message.READ("5", null,Clients.get(1), null,null,true,3);
+
+//        rmsg.c.tell(rmsg,getSelf());
+//        rmsg.c.tell(rmsg1,getSelf());
+//        rmsg.c.tell(rmsg,getSelf());
+//        rmsg.c.tell(rmsg1,getSelf());
+//        rmsg.c.tell(rmsg,getSelf());
+//        rmsg.c.tell(rmsg1,getSelf());
+//        rmsg.c.tell(rmsg,getSelf());
+//        rmsg.c.tell(rmsg1,getSelf());
+//        rmsg.c.tell(rmsg,getSelf());
+//        rmsg.c.tell(rmsg1,getSelf());
+//        rmsg.c.tell(rmsg,getSelf());
+//        rmsg.c.tell(rmsg1,getSelf());
+//
+//        cwmsg.c.tell(cwmsg,getSelf());
+//        rmsg.c.tell(rmsg1,getSelf());
+//        cwmsg.c.tell(cwmsg1,getSelf());
+//        L1cs.get(0).tell(new Message.CRASH(), getSelf())git ;
+//        rmsg.c.tell(rmsg,getSelf());
 
         // sending tasks to clienst
 //        System.out.println(L1cs.get(0).path().name());
-        setTimeout(1500,L1cs.get(0));
-        setTimeout(3000,L1cs.get(0));
-        setTimeout(450,L1cs.get(1));
-        setTimeout(1500,L1cs.get(1));
-        setTimeout(250,L2cs.get(1));
-        setTimeout(700,L2cs.get(1));
-
-        setTimeout(350,L2cs.get(0));
-        // setTimeout(1500,L2cs.get(0));
+//        setTimeout(20,L1cs.get(0));
+//        setTimeout(3000,L1cs.get(0));
+//        setTimeout(450,L1cs.get(1));
+//        setTimeout(1500,L1cs.get(1));
+//        setTimeout(1,L2cs.get(1));
+//        setTimeout(400,L2cs.get(1));
+//
+//        setTimeout(350,L2cs.get(0));
+//         setTimeout(1500,L2cs.get(0));
+//        L2cs.get(0).tell(new Message.CRASH(),getSelf());
 
         this.doing_tasks(msg, Clients);
 
@@ -98,13 +127,15 @@ public class God extends AbstractActor {
             if(Message.READ.class == msg.getClass()){
                 ((Message.READ) msg).c = clients.get(clients_index);
                 ((Message.READ) msg).c.tell(((Message.READ) msg),getSelf());
-
             } else if (Message.WRITE.class == msg.getClass()) {
                 ((Message.WRITE) msg).c = clients.get(clients_index);
                 ((Message.WRITE) msg).c.tell(((Message.WRITE) msg), getSelf());
             } else if (Message.CREAD.class == msg.getClass()) {
                 ((Message.CREAD) msg).c = clients.get(clients_index);
                 ((Message.CREAD) msg).c.tell(((Message.CREAD) msg), getSelf());
+            } else if (Message.CWRITE.class == msg.getClass()) {
+                ((Message.CWRITE) msg).c = clients.get(clients_index);
+                ((Message.CWRITE) msg).c.tell(((Message.CWRITE) msg), getSelf());
             }
 
         }
@@ -112,19 +143,22 @@ public class God extends AbstractActor {
     }
 
 
-    private static List<Object> generate_tasks(int n_reads, int n_writes, int n_creads, List<ActorRef> Lc2ref){
+    private static List<Object> generate_tasks(int n_reads, int n_writes, int n_creads, int n_cwrites){
         List<Object> messageList = new ArrayList<Object>();
+        int id = 1000;
+
         for(int n_r = 0; n_r < n_reads; n_r++){
 
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
-            int indx = ThreadLocalRandom.current().nextInt(0, Lc2ref.toArray().length);
+
 
             Message.READ MSG = new Message.READ(String.valueOf(key_to_ask),
                     null,
                     null,
                     null,
                     null,
-                    true);
+                    true,
+                    id++);
             messageList.add(MSG);
         }
         for(int n_w = 0; n_w < n_writes; n_w++){
@@ -132,26 +166,40 @@ public class God extends AbstractActor {
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
             int value_to_write = key_to_ask*key_to_ask-1;
 
-            int indx = ThreadLocalRandom.current().nextInt(0, Lc2ref.toArray().length);
             Message.WRITE MSG = new Message.WRITE(String.valueOf(key_to_ask),
                     String.valueOf(value_to_write),
                     null,
                     null,
                     null,
-                    true);
+                    true,
+                    id++);
             messageList.add(MSG);
         }
-        for(int n_r = 0; n_r < n_creads; n_r++){
+        for(int n_cr = 0; n_cr < n_creads; n_cr++){
 
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
 
-            int indx = ThreadLocalRandom.current().nextInt(0, Lc2ref.toArray().length);
             Message.CREAD MSG = new Message.CREAD(String.valueOf(key_to_ask),
                     null,
                     null,
                     null,
                     null,
-                    true);
+                    true,
+                    id++);
+            messageList.add(MSG);
+        }
+        for(int n_cw = 0; n_cw < n_cwrites; n_cw++){
+
+            int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
+            int value_to_write = -key_to_ask*key_to_ask*10;
+
+            Message.CWRITE MSG = new Message.CWRITE(String.valueOf(key_to_ask),
+                    String.valueOf(value_to_write),
+                    null,
+                    null,
+                    null,
+                    true,
+                    id++);
             messageList.add(MSG);
         }
 

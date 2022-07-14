@@ -13,6 +13,7 @@ public class Message {
     public Message() {}
 
     public static class READ extends Message implements Serializable {
+        public final int id;
         public final String key;
         public String value;
         public ActorRef c;
@@ -20,17 +21,19 @@ public class Message {
         public ActorRef L1;
         public Boolean forward;
 
-        public READ(String key, String value, ActorRef c, ActorRef L2, ActorRef L1, Boolean forward) {
+        public READ(String key, String value, ActorRef c, ActorRef L2, ActorRef L1, Boolean forward, int id) {
             this.key = key;
             this.value = value;
             this.c = c;
             this.L1 = L1;
             this.L2 = L2;
             this.forward = forward;
+            this.id = id;
         }
     }
 
     public static class WRITE extends Message implements Serializable {
+        public final int id;
         public final String key;
         public String value;
         public ActorRef c;
@@ -39,7 +42,7 @@ public class Message {
         public boolean forward;
         public boolean done;
 
-        public WRITE(String key, String value, ActorRef c, ActorRef L2, ActorRef L1, boolean forward) {
+        public WRITE(String key, String value, ActorRef c, ActorRef L2, ActorRef L1, boolean forward, int id) {
             this.key = key;
             this.value = value;
             this.c = c;
@@ -47,10 +50,12 @@ public class Message {
             this.L2 = L2;
             this.forward = forward;
             this.done = false;
+            this.id = id;
         }
     }
 
     public static class CREAD extends Message implements Serializable {
+        public final int id;
         public final String key;
         public String value;
         public ActorRef c;
@@ -58,51 +63,63 @@ public class Message {
         public ActorRef L1;
         public Boolean forward;
 
-        public CREAD(String key, String value, ActorRef c, ActorRef L2, ActorRef L1, Boolean forward) {
+        public CREAD(String key, String value, ActorRef c, ActorRef L2, ActorRef L1, Boolean forward, int id) {
+
             this.key = key;
             this.value = value;
             this.c = c;
             this.L1 = L1;
             this.L2 = L2;
             this.forward = forward;
+            this.id = id;
         }
     }
 
     public static class CWRITE extends Message implements Serializable {
+        public final int id;
         public final String key;
         public String value;
         public ActorRef c;
         public ActorRef L2;
         public ActorRef L1;
         public Boolean forward;
-        public Boolean done;
 
-        public CWRITE(String key, String value, ActorRef c, ActorRef L2, ActorRef L1, Boolean forward) {
+        public String done;
+
+        public CWRITE(String key, String value, ActorRef c, ActorRef L2, ActorRef L1, Boolean forward, int id) {
+
             this.key = key;
             this.value = value;
             this.c = c;
             this.L1 = L1;
             this.L2 = L2;
             this.forward = forward;
-            this.done = false;
+            this.done = "";
+            this.id = id;
         }
     }
 
     public static class CW_check implements Serializable{
-        public boolean R;
-        public boolean P;
-        public boolean A;
-        public CWRITE cwrite;
-        public boolean forward;
+        public String key;
 
-        public CW_check(CWRITE cwrite){
-            this.R = false;
-            this.P = false;
-            this.A = false;
-            this.cwrite = cwrite;
-            this.forward = false;
+        public CW_check(String key){
+            this.key = key;
         }
     }
+    public static class WriteCW implements Serializable{
+        public String key;
+        public String value;
+
+        public WriteCW(String key, String value){
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+    public static class Abort implements Serializable {}
+    public static class CWTimeOut implements Serializable {}
+
+
 
     public static class printLogs implements Serializable {
         public printLogs(){
@@ -124,6 +141,11 @@ public class Message {
 
         }
     }
+    public static class DeleteCache implements Serializable {
+        public DeleteCache(){
+
+        }
+    }
 
     public static class CRASH implements Serializable {}
 
@@ -135,6 +157,9 @@ public class Message {
             this.L2 = L2;
         }
     }
+    public static class CW_ch implements Serializable {}
+
+
 
 //    public static class
 
