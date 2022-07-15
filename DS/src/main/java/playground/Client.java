@@ -17,7 +17,7 @@ public class Client extends AbstractActor {
     private final int id;                           // permanant id for visit
     private List<ActorRef> L2Crefs;                 // parent list, one client will have several L2 parents
     private List<Message> continer;                 // queue for received messages
-    private Boolean Send;
+    private Boolean Send;                           // state: whether is processing msg
     private Random rnd = new Random();
     private String myLog;
     private int waitingTime;
@@ -84,7 +84,7 @@ public class Client extends AbstractActor {
         // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
             // if is sending message now, just add to container
-            if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+            if(this.Send){
                 this.continer.add(msg);
             }
             else {
@@ -101,7 +101,7 @@ public class Client extends AbstractActor {
         // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
             // if is sending message now, just add to container
-            if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+            if(this.Send){
                 this.continer.add(msg);
             }
             else {
@@ -117,7 +117,7 @@ public class Client extends AbstractActor {
         // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
             // if is sending message now, just add to container
-            if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+            if(this.Send){
                 this.continer.add(msg);
             }
             else {
@@ -133,14 +133,13 @@ public class Client extends AbstractActor {
         // check the direction of the msg(forward to db or backward to client)
         if(msg.forward){
             // if is sending message now, just add to container
-            if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+            if(this.Send){
                 this.continer.add(msg);
-            }
-            else {
+            } else {
                 msg.L2 = chooseL2();                // set the target parent of the message
                 sendCWriteMessage(msg);
                 setTimeout(this.waitingTime, msg);}
-        }else {
+        } else {
             receiveCWrite(msg);
         }
     }
@@ -149,7 +148,7 @@ public class Client extends AbstractActor {
         this.myLog = this.myLog + " {GET READ RESULT ("+msg.key+","+msg.value+") FROM "+ msg.L2.path().name() + "}\n";
         if(msg.id == this.lastMassegeId){
             this.Send = false;
-            timer.cancel();
+            timer.cancel();                         // cancel the timeout timer
             if(!this.continer.isEmpty()){ nextMessage();}
         }
 
@@ -160,7 +159,7 @@ public class Client extends AbstractActor {
 
         if(msg.id == this.lastMassegeId){
             this.Send = false;
-            timer.cancel();
+            timer.cancel();                         // cancel the timeout timer
             if(!this.continer.isEmpty()){ nextMessage();}
         }
     }
@@ -170,7 +169,7 @@ public class Client extends AbstractActor {
 
         if(msg.id == this.lastMassegeId){
             this.Send = false;
-            timer.cancel();
+            timer.cancel();                         // cancel the timeout timer
             if(!this.continer.isEmpty()){ nextMessage();}
         }
     }
@@ -180,7 +179,7 @@ public class Client extends AbstractActor {
 
         if(msg.id == this.lastMassegeId){
             this.Send = false;
-            timer.cancel();
+            timer.cancel();                         // cancel the timeout timer
             if(!this.continer.isEmpty()){ nextMessage();}
         }
     }

@@ -20,7 +20,7 @@ public class L1C extends AbstractActor {
     private boolean cw_waiting;
     private int waitingTime;
     private int deletingTime;
-    private boolean sent;
+    private boolean sent;                                                  // state whether is forward msg
     private String MyLog;
     private String check_state;
     private Boolean state;                                                 // state used for critical write
@@ -28,7 +28,7 @@ public class L1C extends AbstractActor {
     private int counter;                                                   // when come back, count the number of attempt to send msg to child(try 3 times here)
     private int child_counter;                                             // count the certificate number from child node for critical write
     private Random rnd = new Random();
-    private String ignorKey;
+    private String ignorKey;                                               // black list for critical write
     private Cancellable timer;
 
     public L1C(ActorRef receiverActor, int id) {
@@ -45,7 +45,7 @@ public class L1C extends AbstractActor {
         this.counter = 0;
         this.deletingTime = 5000;
         setTimetoDeleteCache(this.deletingTime);
-        this.ignorKey = "-1";
+        this.ignorKey = "-1";       
         this.L2s = new ArrayList<ActorRef>();
     }
 
@@ -62,7 +62,7 @@ public class L1C extends AbstractActor {
                 if(this.sent){
                     this.continer.add(msg);
                 }else {
-                    // if have the key, return the value, else forward to parent
+                    // if have the key(and not in black list), return the value, else forward to parent
                     if(this.Ldata.containsKey(msg.key) && msg.key != this.ignorKey) {
                         msg.value = this.Ldata.get(msg.key);
                         msg.forward = false;
@@ -210,15 +210,15 @@ public class L1C extends AbstractActor {
 
     private void checking(Message.CW_check msg) {
        if(!this.crash){
-           // ignor the key,
+           // ignore the key,
            this.ignorKey = msg.key;
-           //send the message to your children
-//           System.out.println(getSelf().path().name()+ " Check children num "+ this.L2s.toArray().length + " " + this.childrenDontKnowImBack.toArray().length);
-
+           // System.out.println(getSelf().path().name()+ " Check children num "+ this.L2s.toArray().length + " " + this.childrenDontKnowImBack.toArray().length);
+           
+           // send the message to all children
            for (int i = 0; i < L2s.toArray().length; i++){
                L2s.get(i).tell(msg, getSelf());
            }
-//           System.out.println(getSelf().path().name() + "goftam check konan "+ ignorKey);
+           // System.out.println(getSelf().path().name() + "goftam check konan "+ ignorKey);
            try { Thread.sleep(rnd.nextInt(10)); }
            catch (InterruptedException e) { e.printStackTrace(); }
 
@@ -227,14 +227,14 @@ public class L1C extends AbstractActor {
            try { Thread.sleep(rnd.nextInt(10)); }
            catch (InterruptedException e) { e.printStackTrace(); }
        }
-
     }
+    
     private void onWriteCW(Message.WriteCW msg){
         if(!this.crash){
-//            System.out.println(getSelf().path().name()+ " children num "+ this.L2s.toArray().length);
+            // System.out.println(getSelf().path().name()+ " children num "+ this.L2s.toArray().length);
             for (int i = 0; i < this.L2s.toArray().length; i++){
                 this.L2s.get(i).tell(msg, getSelf());
-//                System.out.println(getSelf().path().name()+ " send write> "+L2s.get(i).path().name());
+                // System.out.println(getSelf().path().name()+ " send write> "+L2s.get(i).path().name());
             }
 
             if(this.Ldata.containsKey(msg.key)){
@@ -289,11 +289,11 @@ public class L1C extends AbstractActor {
 
     private void updateLostChildren(Message.ImBack msg){
         this.childrenDontKnowImBack.remove(this.childrenDontKnowImBack.indexOf(msg.L2));
-//        System.out.println(getSelf().path().name()+" YOU back ==> "+ msg.L2.path().name() + " || they Dont know =>"+ printL());
+        // System.out.println(getSelf().path().name()+" YOU back ==> "+ msg.L2.path().name() + " || they Dont know =>"+ printL());
         if (this.childrenDontKnowImBack.isEmpty()) {
             this.timer.cancel();
             this.MyLog += " {Children know!}\n";
-//            System.out.println(getSelf().path().name()+" DoNE!!!!!");
+            // System.out.println(getSelf().path().name()+" DoNE!!!!!");
         }
     }
     private void deteleCache() {
@@ -326,12 +326,12 @@ public class L1C extends AbstractActor {
     }
 
     private void tellChildren() {
-//        printL();
-//        System.out.println(getSelf().path().name()+" they dont know => " + printL());
+        // printL();
+        // System.out.println(getSelf().path().name()+" they dont know => " + printL());
         for(int i = 0; i < this.childrenDontKnowImBack.toArray().length; i++){
             Message.ImBack msg = new Message.ImBack(getSelf(), null);
             this.childrenDontKnowImBack.get(i).tell(msg, getSelf());
-//            System.out.println(getSelf().path().name()+" Im back ==> "+ this.childrenDontKnowImBack.get(i).path().name());
+            // System.out.println(getSelf().path().name()+" Im back ==> "+ this.childrenDontKnowImBack.get(i).path().name());
         }
         setTimeout(this.waitingTime);
         try { Thread.sleep(rnd.nextInt(10)); }

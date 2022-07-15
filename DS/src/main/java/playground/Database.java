@@ -61,7 +61,6 @@ public class Database extends AbstractActor {
     }
 
     private void write(Message.WRITE msg){
-
         this.data.put(msg.key, msg.value);
         Mylog += " {WRITE ("+msg.key+","+msg.value+") FROM "+ getSender().path().name() +" FINISHED}\n";
         msg.forward = false;
@@ -80,7 +79,6 @@ public class Database extends AbstractActor {
     }
 
     private void cread(Message.CREAD msg) {
-
         msg.value = this.data.get(msg.key);
         msg.forward = false;
         Mylog += " {CRITICAL READ VALUE OF KEY: " + msg.key + " FROM " + getSender().path().name() +"}\n";
@@ -90,7 +88,6 @@ public class Database extends AbstractActor {
 
     }
     private void cwrite(Message.CWRITE msg){
-
         if(CWisGoingOn){
             this.continer.add(msg);
         }else {
@@ -126,7 +123,7 @@ public class Database extends AbstractActor {
     }
     private void checking() {
         L1sIsReady.add(getSender());
-//        System.out.println(L1sIsReady.toArray().length);
+        // System.out.println(L1sIsReady.toArray().length);
         if(L1sIsReady.toArray().length == L1s.toArray().length){
             L1sIsReady.clear();
             timer.cancel();
@@ -149,7 +146,6 @@ public class Database extends AbstractActor {
         }
         // if list of answers or same as L1s
         // send commit
-
     }
 
     private void sendWrite() {

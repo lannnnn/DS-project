@@ -20,6 +20,7 @@ public class L2C extends AbstractActor {
     private ActorRef parent;                                               // current parent, L1 or database
     private ActorRef L1;                                                   // original assigned L1
     private ActorRef databaseRef;
+    private Boolean Send;                                                  // state: whether is processing msg
 
     private HashMap<String, String> Ldata = new HashMap<String, String>(); // cache data table
     private List<Message> continer;                                        // message queue
@@ -27,7 +28,6 @@ public class L2C extends AbstractActor {
     private int deletingTime;
     private boolean cw_waiting;
     private Boolean crash;
-    private List<Boolean> sent;                                            // processing state for sent requirements
     private Object lastMessage;
     private boolean timeoutSend;
     private String MyLog;
@@ -35,21 +35,21 @@ public class L2C extends AbstractActor {
     private Cancellable timer;
     private Cancellable CWTimer;
     private int lastMassegeId;
-    private Boolean Send;
     private String ignoreKey;
     private int AbortwaitingTime;
 
     public L2C(List<ActorRef> L1s, ActorRef databaseRef,int id) {
         this.id = id;
         this.databaseRef = databaseRef;
+        // random pick a L1 as parent
         int indx = ThreadLocalRandom.current().nextInt(0, L1s.toArray().length);
         this.parent = L1s.get(indx);
         this.L1 = this.parent;
         System.out.println(getSelf().path().name() + ": assigned parent : " + this.parent.path().name());
+        // register to the parent
         this.tell_your_parent(this.parent);
         this.cw_waiting = false;
         this.MyLog = getSelf().path().name() + ":\n";
-        this.sent = new ArrayList<>();
         this.timeoutSend = false;
         this.continer = new ArrayList<>();
         this.crash = false;
@@ -60,7 +60,6 @@ public class L2C extends AbstractActor {
         this.Send = false;
         this.ignoreKey = "-1";
         setTimetoDeleteCache(this.deletingTime);
-
     }
 
     private void tell_your_parent(ActorRef receiver){
@@ -82,7 +81,7 @@ public class L2C extends AbstractActor {
             // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
                 // if is sending message now, just add to container
-                if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+                if(this.Send){
                     this.continer.add(msg);
                 }else {
                     // if have the key, return the value, else forward to parent
@@ -97,7 +96,6 @@ public class L2C extends AbstractActor {
                         msg.L2 = getSelf();
                         this.MyLog = this.MyLog + " {FORWARD READ REQ "+ msg.key +" FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";
                         this.lastMessage = msg;
-                        this.sent.add(true);
                         this.Send = true;
                         this.sendMessageR((Message.READ) this.lastMessage,this.parent);
                         setTimeout(this.waitingTime);
@@ -126,7 +124,7 @@ public class L2C extends AbstractActor {
             // check the direction of the msg(forward to db or backward to client)
             if(msg.forward){
                 // if is sending message now, just add to container
-                if(this.Send){//if(!this.sent.isEmpty() && this.sent.get(this.sent.toArray().length-1)){
+                if(this.Send){
                     this.continer.add(msg);
                 }else {
                     this.lastMassegeId = msg.id;
@@ -134,7 +132,6 @@ public class L2C extends AbstractActor {
 
                     msg.L2 = getSelf();
                     this.MyLog = this.MyLog + " {SEND WRITE REQ("+msg.key+","+msg.value+") FROM " +getSender().path().name() + " TO "+ this.parent.path().name() +"}\n";
-                    this.sent.add(true);
                     sendMessageW(msg, this.parent);
                     this.lastMessage = msg;
                     setTimeout(this.waitingTime);
@@ -154,7 +151,6 @@ public class L2C extends AbstractActor {
                         if(!this.continer.isEmpty()){ nextMessage();}
                     }
                 }
-
             }
         }
     }
@@ -172,7 +168,6 @@ public class L2C extends AbstractActor {
                     this.lastMassegeId = msg.id;
                     this.Send = true;
                     msg.L2 = getSelf();
-                    this.sent.add(true);
                     this.MyLog = this.MyLog + " {FORWARD CRITICAL READ REQ "+ msg.key +" FROM "+ msg.c.path().name()+" TO "+this.parent.path().name()+"}\n";                    this.sendMessageCR(msg,this.parent);
                     this.lastMessage = msg;
                     setTimeout(this.waitingTime);
@@ -189,7 +184,6 @@ public class L2C extends AbstractActor {
                     if(!this.continer.isEmpty()){ nextMessage();}
 
                 }
-
             }
         }
     }
@@ -207,16 +201,15 @@ public class L2C extends AbstractActor {
                     this.Send = true;
                     msg.L2 = getSelf();
                     this.MyLog = this.MyLog + " {SEND CWRITE REQ("+msg.key+","+msg.value+") FROM " +getSender().path().name() + " TO "+ this.parent.path().name() +"}\n";
-                    this.sent.add(true);
                     sendMessageCW(msg, this.parent);
                     this.lastMessage = msg;
                     setTimeout(this.waitingTime);
                 }
             } else {
                 if(msg.L2 == getSelf()){
-                    // change the first true to false
                     this.MyLog = this.MyLog + " {BACKWORD CWRITE CERTIFICATION ("+msg.key+","+msg.value+", "+msg.done +" ) FROM "+getSender().path().name()+" TO "+msg.c.path().name()+"}\n";
                     this.sendMessageCW(msg,msg.c);
+                    // cancel the timeout timer
                     if(this.lastMassegeId == msg.id){
                         this.Send = false;
                         timer.cancel();
@@ -298,14 +291,14 @@ public class L2C extends AbstractActor {
     }
 
     private void CWTimeOut() {
-//        System.out.println(getSelf().path().name() + "time out CW "+this.crash);
+        // System.out.println(getSelf().path().name() + "time out CW "+this.crash);
         if(!this.crash){
             if(this.Ldata.containsKey(this.ignoreKey)){
                 this.Ldata.remove(this.ignoreKey);
             }
             this.ignoreKey = "-1";
         }
-//        System.out.println(this.Ldata);
+        // System.out.println(this.Ldata);
     }
 
     private void onAbort() {
@@ -320,22 +313,23 @@ public class L2C extends AbstractActor {
 
     private void checking(Message.CW_check msg) {
         if(!this.crash){
+            // add the cw key to black list
             this.ignoreKey = msg.key;
-//            System.out.println(getSelf().path().name() + " ignore key  => "+ this.ignoreKey);
+            // System.out.println(getSelf().path().name() + " ignore key  => "+ this.ignoreKey);
             setCWTimeout(this.AbortwaitingTime);
         }
     }
 
     private void onWriteCW(Message.WriteCW msg) {
 
-//        System.out.println(getSelf().path().name() + " I have to write it! "+ msg.key+ this.crash);
+        // System.out.println(getSelf().path().name() + " I have to write it! "+ msg.key+ this.crash);
 
         if(!this.crash){
-//            System.out.println(msg.key+"   "+ this.Ldata);
+            // System.out.println(msg.key+"   "+ this.Ldata);
             if(this.Ldata.containsKey(msg.key)){
                 this.Ldata.put(msg.key,msg.value);
-//                System.out.println(getSelf().path().name() + " Update ++++++++++   "+ msg.key + " "+ msg.value);
-//                System.out.println(this.Ldata);
+                // System.out.println(getSelf().path().name() + " Update ++++++++++   "+ msg.key + " "+ msg.value);
+                // System.out.println(this.Ldata);
             }
             this.ignoreKey = "-1";
             CWTimer.cancel();
@@ -373,7 +367,7 @@ public class L2C extends AbstractActor {
             this.parent = msg.L1;
             Message.ImBack backmsg = new Message.ImBack(this.L1, getSelf());
             this.parent.tell(backmsg, getSelf());
-//            System.out.println(backmsg.L1.path().name() + " recovered, back to be the parent of " + getSelf().path().name());
+            // System.out.println(backmsg.L1.path().name() + " recovered, back to be the parent of " + getSelf().path().name());
             try { Thread.sleep(rnd.nextInt(10)); }
             catch (InterruptedException e) { e.printStackTrace(); }
         }
