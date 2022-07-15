@@ -21,7 +21,7 @@ dependencies {
 compileJava {
     options.compilerArgs += ["-Xlint:deprecation"]
 }
-mainClassName = "it.unitn.ds1.MultiCache"
+mainClassName = "playground.App"
 
 run {
     standardInput = System.in
