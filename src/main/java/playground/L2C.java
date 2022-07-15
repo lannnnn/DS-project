@@ -26,10 +26,8 @@ public class L2C extends AbstractActor {
     private List<Message> continer;                                        // message queue
     private int waitingTime;
     private int deletingTime;
-    private boolean cw_waiting;
     private Boolean crash;
     private Object lastMessage;
-    private boolean timeoutSend;
     private String MyLog;
     private Random rnd = new Random();
     private Cancellable timer;
@@ -48,9 +46,7 @@ public class L2C extends AbstractActor {
         System.out.println(getSelf().path().name() + ": assigned parent : " + this.parent.path().name());
         // register to the parent
         this.tell_your_parent(this.parent);
-        this.cw_waiting = false;
         this.MyLog = getSelf().path().name() + ":\n";
-        this.timeoutSend = false;
         this.continer = new ArrayList<>();
         this.crash = false;
         this.waitingTime = 500;
@@ -415,7 +411,6 @@ public class L2C extends AbstractActor {
             try { Thread.sleep(rnd.nextInt(200)+300); }
             catch (InterruptedException e) { e.printStackTrace(); }
             this.MyLog += " {RECOVER} \n";
-            this.timeoutSend = false;
             this.crash = false;
         }
     }

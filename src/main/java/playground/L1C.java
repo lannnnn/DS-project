@@ -16,14 +16,10 @@ public class L1C extends AbstractActor {
     private List<ActorRef> childrenDontKnowImBack;
     private HashMap<String, String> Ldata = new HashMap<String, String>();
     private List<Message> continer;
-    private List<Integer> keys;
-    private boolean cw_waiting;
     private int waitingTime;
     private int deletingTime;
     private boolean sent;                                                  // state whether is forward msg
     private String MyLog;
-    private String check_state;
-    private Boolean state;                                                 // state used for critical write
     private Boolean crash;
     private int counter;                                                   // when come back, count the number of attempt to send msg to child(try 3 times here)
     private int child_counter;                                             // count the certificate number from child node for critical write
@@ -35,7 +31,6 @@ public class L1C extends AbstractActor {
         this.id = id;
         this.parent = receiverActor;
         this.tell_your_parent(this.parent);
-        this.cw_waiting = false;
         this.MyLog = getSelf().path().name() + ":\n";
         this.sent = false;
         this.continer = new ArrayList<>();

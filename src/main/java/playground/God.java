@@ -55,13 +55,13 @@ public class God extends AbstractActor {
         // rmsg.c.tell(rmsg,getSelf());
 
         // sending tasks to clienst
-        // System.out.println(L1cs.get(0).path().name());
-        // setTimeout(20,L1cs.get(0));
-        // setTimeout(3000,L1cs.get(0));
-        // setTimeout(450,L1cs.get(1));
-        // setTimeout(1500,L1cs.get(1));
-        // setTimeout(1,L2cs.get(1));
-        // setTimeout(400,L2cs.get(1));
+        System.out.println(L1cs.get(0).path().name());
+        setTimeout(20,L1cs.get(0));
+        setTimeout(3000,L1cs.get(0));
+        setTimeout(450,L1cs.get(1));
+        setTimeout(1500,L1cs.get(1));
+        setTimeout(1,L2cs.get(1));
+        setTimeout(400,L2cs.get(1));
 
         // setTimeout(350,L2cs.get(0));
         // setTimeout(1500,L2cs.get(0));
