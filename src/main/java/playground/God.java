@@ -22,9 +22,11 @@ public class God extends AbstractActor {
         // HI lets play a game
         System.out.println("Hi, I'm God!");
 
-        if (scenario == "read_L1_crash_tasks") {
-            read_L1_crash_tasks(Clients,L1cs);
-        }else {
+        if (scenario == "write_L1_crash_tasks") {
+            write_L1_crash_tasks(Clients,L1cs);
+        } else if (scenario == "cwrite_L1_crash_tasks") {
+            cwrite_L1_crash_tasks(Clients,L1cs);
+        } else {
              List<Object> msg = this.generate_tasks(5,5, 5,5);
             System.out.println("God: generate "+ msg.toArray().length+ " tasks!");
             this.doing_tasks(msg, Clients);
@@ -173,7 +175,7 @@ public class God extends AbstractActor {
         return messageList;
     }
 
-    private void read_L1_crash_tasks(List<ActorRef> Clients, List<ActorRef> L1cs){
+    private void write_L1_crash_tasks(List<ActorRef> Clients, List<ActorRef> L1cs){
         int id = 1000;
         // generate n read operations all read the same data
         int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
@@ -185,6 +187,32 @@ public class God extends AbstractActor {
         this.SendMessage(100, L1cs.get(0), new Message.CRASH());
         // a client write a new value
         this.SendMessage(110, Clients.get(0), new Message.WRITE(String.valueOf(key_to_ask), "1234", Clients.get(0), null, null, true, id++));
+
+        // generate n read operations all read the same data
+        for(int n_r = 0; n_r < Clients.toArray().length; n_r++){
+            Message.READ MSG = new Message.READ(String.valueOf(key_to_ask), null, Clients.get(n_r), null, null, true, id++);
+            this.SendMessage(130, Clients.get(n_r), MSG);
+        }
+
+        // generate n cread operations all read the same data
+        for(int n_r = 0; n_r < Clients.toArray().length; n_r++){
+            Message.CREAD MSG = new Message.CREAD(String.valueOf(key_to_ask), null, Clients.get(n_r), null, null, true, id++);
+            this.SendMessage(150, Clients.get(n_r), MSG);
+        }
+    }
+
+    private void cwrite_L1_crash_tasks(List<ActorRef> Clients, List<ActorRef> L1cs){
+        int id = 1000;
+        // generate n read operations all read the same data
+        int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
+        for(int n_r = 0; n_r < Clients.toArray().length; n_r++){
+            Message.READ MSG = new Message.READ(String.valueOf(key_to_ask), null, Clients.get(n_r), null, null, true, id++);
+            this.SendMessage(50, Clients.get(n_r), MSG);
+        }
+        // first L1 crash msg
+        this.SendMessage(100, L1cs.get(0), new Message.CRASH());
+        // a client write a new value
+        this.SendMessage(110, Clients.get(0), new Message.CWRITE(String.valueOf(key_to_ask), "1234", Clients.get(0), null, null, true, id++));
 
         // generate n read operations all read the same data
         for(int n_r = 0; n_r < Clients.toArray().length; n_r++){
