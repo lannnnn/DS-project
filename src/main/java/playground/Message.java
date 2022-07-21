@@ -147,7 +147,12 @@ public class Message {
         }
     }
 
-    public static class CRASH implements Serializable {}
+    public static class CRASH implements Serializable {
+        public ActorRef target;
+        public CRASH() {
+
+        }
+    }
 
     public static class ImBack implements Serializable {
         ActorRef L1;
