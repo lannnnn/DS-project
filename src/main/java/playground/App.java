@@ -13,11 +13,12 @@ import akka.actor.ActorSystem;
 
 
 public class App {
-    final static int n_client = 3;
+    final static int n_client = 4;
     final static int n_l2 = 3;
     final static int n_l1 = 2;
 
     public static void main(String[] args) {
+        String scenario = "read_L1_crash_tasks";
         final ActorSystem system = ActorSystem.create("test1");
         List<ActorRef> l2s = new ArrayList<>();
         List<ActorRef> l1s = new ArrayList<>();
@@ -56,7 +57,7 @@ public class App {
 
         // Create controller
         final ActorRef GD = system.actorOf(
-                God.props(cs,l2s,l1s,DB,100),
+                God.props(cs,l2s,l1s,DB, scenario),
                 "God"
         );
 
@@ -65,8 +66,9 @@ public class App {
             System.in.read();
         }
         catch (IOException ioe) {}
-        finally {    
+        finally {
             system.terminate();
         }
     }
 }
+

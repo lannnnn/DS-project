@@ -18,106 +18,79 @@ import static akka.pattern.Patterns.ask;
 
 public class God extends AbstractActor {
 
-    public God(List<ActorRef> Clients, List<ActorRef> L2cs, List<ActorRef> L1cs, ActorRef database, int id){
+    public God(List<ActorRef> Clients, List<ActorRef> L2cs, List<ActorRef> L1cs, ActorRef database, String scenario){
         // HI lets play a game
         System.out.println("Hi, I'm God!");
 
+        if (scenario == "read_L1_crash_tasks") {
+            read_L1_crash_tasks(Clients,L1cs);
+        }else {
+             List<Object> msg = this.generate_tasks(5,5, 5,5);
+            System.out.println("God: generate "+ msg.toArray().length+ " tasks!");
+            this.doing_tasks(msg, Clients);
+        }
+//        List<Object> msg = ( 10, 10, L2cs, L1cs);
 
-        // making task
+        // // making task
 
-        List<Object> msg = this.generate_tasks(5,5, 5,5);
 
-        System.out.println("God: generate "+ msg.toArray().length+ " tasks!");
-//        setTimeout(20,L1cs.get(0));
-//        setTimeout(25,L1cs.get(0));
 
-        Message.CWRITE cwmsg = new Message.CWRITE("5", "-50", Clients.get(0),null,null,true,0);
-        Message.CWRITE cwmsg1 = new Message.CWRITE("5", "-60", Clients.get(0),null,null,true,1);
-        Message.READ rmsg = new Message.READ("5", null,Clients.get(1), null,null,true,2);
-        Message.READ rmsg1 = new Message.READ("5", null,Clients.get(1), null,null,true,3);
+        // // sending timeout to caches
+        // setTimeout(20,L1cs.get(0));
+        // setTimeout(3000,L1cs.get(0));
+        // setTimeout(450,L1cs.get(1));
+        // setTimeout(1500,L1cs.get(1));
+        // setTimeout(1,L2cs.get(1));
+        // setTimeout(400,L2cs.get(1));
 
-//        rmsg.c.tell(rmsg,getSelf());
-//        rmsg.c.tell(rmsg1,getSelf());
-//        rmsg.c.tell(rmsg,getSelf());
-//        rmsg.c.tell(rmsg1,getSelf());
-//        rmsg.c.tell(rmsg,getSelf());
-//        rmsg.c.tell(rmsg1,getSelf());
-//        rmsg.c.tell(rmsg,getSelf());
-//        rmsg.c.tell(rmsg1,getSelf());
-//        rmsg.c.tell(rmsg,getSelf());
-//        rmsg.c.tell(rmsg1,getSelf());
-//        rmsg.c.tell(rmsg,getSelf());
-//        rmsg.c.tell(rmsg1,getSelf());
-//
-//        cwmsg.c.tell(cwmsg,getSelf());
-//        rmsg.c.tell(rmsg1,getSelf());
-//        cwmsg.c.tell(cwmsg1,getSelf());
-//        L1cs.get(0).tell(new Message.CRASH(), getSelf());
-//        rmsg.c.tell(rmsg,getSelf());
-
-        // sending tasks to clienst
-//        System.out.println(L1cs.get(0).path().name());
-//        setTimeout(20,L1cs.get(0));
-//        setTimeout(3000,L1cs.get(0));
-//        setTimeout(450,L1cs.get(1));
-//        setTimeout(1500,L1cs.get(1));
-//        setTimeout(1,L2cs.get(1));
-//        setTimeout(400,L2cs.get(1));
-//
-//        setTimeout(350,L2cs.get(0));
-//         setTimeout(1500,L2cs.get(0));
-//        L2cs.get(0).tell(new Message.CRASH(),getSelf());
-
-        this.doing_tasks(msg, Clients);
-
+        // // setTimeout(350,L2cs.get(0));
+        // // setTimeout(1500,L2cs.get(0));
+        // // L2cs.get(0).tell(new Message.CRASH(),getSelf());
         //ending ask every one to print their log
-
         try {
-            TimeUnit.SECONDS.sleep(12);
+            TimeUnit.SECONDS.sleep(10);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
 
         Message.printLogs print_log = new Message.printLogs();
+        // print client peration logs
         for(int i = 0; i < Clients.toArray().length; i++){
-
             Clients.get(i).tell(print_log, getSelf());
         }
         try {
-            TimeUnit.SECONDS.sleep(2);
+            TimeUnit.SECONDS.sleep(1);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
 
+        // print L2 operation logs
         for(int i = 0; i < L2cs.toArray().length; i++){
-
             L2cs.get(i).tell(print_log, getSelf());
         }
         System.out.println("");
         try {
-            TimeUnit.SECONDS.sleep(2);
+            TimeUnit.SECONDS.sleep(1);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
         System.out.println("");
+        // print L1 operation logs
         for(int i = 0; i < L1cs.toArray().length; i++){
-
             L1cs.get(i).tell(print_log, getSelf());
         }
-
         try {
-            TimeUnit.SECONDS.sleep(2);
+            TimeUnit.SECONDS.sleep(1);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-
         System.out.println();
+        // print DB operation logs
         database.tell(print_log, getSelf());
-
     }
 
-    static public Props props(List<ActorRef> Clients, List<ActorRef> L2cs, List<ActorRef> L1cs, ActorRef database, int id) {
-        return Props.create(God.class, () -> new God(Clients, L2cs,L1cs, database , id));
+    static public Props props(List<ActorRef> Clients, List<ActorRef> L2cs, List<ActorRef> L1cs, ActorRef database, String scenario) {
+        return Props.create(God.class, () -> new God(Clients, L2cs,L1cs, database , scenario));
     }
 
     private void doing_tasks(List<Object> tasks, List<ActorRef> clients){
@@ -137,21 +110,18 @@ public class God extends AbstractActor {
                 ((Message.CWRITE) msg).c = clients.get(clients_index);
                 ((Message.CWRITE) msg).c.tell(((Message.CWRITE) msg), getSelf());
             }
-
+//            else if (Message.CRASH.class == msg.getClass()) {
+//                setTimeout(350, ((Message.CRASH) msg).target);
+//            }
         }
-
     }
-
 
     private static List<Object> generate_tasks(int n_reads, int n_writes, int n_creads, int n_cwrites){
         List<Object> messageList = new ArrayList<Object>();
         int id = 1000;
-
+        // generate n read operations
         for(int n_r = 0; n_r < n_reads; n_r++){
-
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
-
-
             Message.READ MSG = new Message.READ(String.valueOf(key_to_ask),
                     null,
                     null,
@@ -161,11 +131,10 @@ public class God extends AbstractActor {
                     id++);
             messageList.add(MSG);
         }
+        // generate n write operations
         for(int n_w = 0; n_w < n_writes; n_w++){
-
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
             int value_to_write = key_to_ask*key_to_ask-1;
-
             Message.WRITE MSG = new Message.WRITE(String.valueOf(key_to_ask),
                     String.valueOf(value_to_write),
                     null,
@@ -175,10 +144,9 @@ public class God extends AbstractActor {
                     id++);
             messageList.add(MSG);
         }
+        // generate n critical read operations
         for(int n_cr = 0; n_cr < n_creads; n_cr++){
-
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
-
             Message.CREAD MSG = new Message.CREAD(String.valueOf(key_to_ask),
                     null,
                     null,
@@ -188,11 +156,10 @@ public class God extends AbstractActor {
                     id++);
             messageList.add(MSG);
         }
+        // generate n critical write operations
         for(int n_cw = 0; n_cw < n_cwrites; n_cw++){
-
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
             int value_to_write = -key_to_ask*key_to_ask*10;
-
             Message.CWRITE MSG = new Message.CWRITE(String.valueOf(key_to_ask),
                     String.valueOf(value_to_write),
                     null,
@@ -202,20 +169,52 @@ public class God extends AbstractActor {
                     id++);
             messageList.add(MSG);
         }
-
         Collections.shuffle(messageList);
-
         return messageList;
     }
 
+    private void read_L1_crash_tasks(List<ActorRef> Clients, List<ActorRef> L1cs){
+        int id = 1000;
+        // generate n read operations all read the same data
+        int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
+        for(int n_r = 0; n_r < Clients.toArray().length; n_r++){
+            Message.READ MSG = new Message.READ(String.valueOf(key_to_ask), null, Clients.get(n_r), null, null, true, id++);
+            this.SendMessage(50, Clients.get(n_r), MSG);
+        }
+        // first L1 crash msg
+        this.SendMessage(100, L1cs.get(0), new Message.CRASH());
+        // a client write a new value
+        this.SendMessage(110, Clients.get(0), new Message.WRITE(String.valueOf(key_to_ask), "1234", Clients.get(0), null, null, true, id++));
+
+        // generate n read operations all read the same data
+        for(int n_r = 0; n_r < Clients.toArray().length; n_r++){
+            Message.READ MSG = new Message.READ(String.valueOf(key_to_ask), null, Clients.get(n_r), null, null, true, id++);
+            this.SendMessage(130, Clients.get(n_r), MSG);
+        }
+
+        // generate n cread operations all read the same data
+        for(int n_r = 0; n_r < Clients.toArray().length; n_r++){
+            Message.CREAD MSG = new Message.CREAD(String.valueOf(key_to_ask), null, Clients.get(n_r), null, null, true, id++);
+            this.SendMessage(150, Clients.get(n_r), MSG);
+        }
+    }
+
+    private void SendMessage(int time, ActorRef reciver, Object msg) {
+        getContext().system().scheduler().scheduleOnce(
+                Duration.create(time, TimeUnit.MILLISECONDS),
+                reciver,
+                msg, // the message to send
+                getContext().system().dispatcher(), getSelf()
+        );
+
+    }
 
     @Override
     public Receive createReceive() {
         return receiveBuilder().match(String.class, s -> System.out.println(s)).build();
-
     }
 
-    void setTimeout(int time, ActorRef reciver) {
+    void setTimeout(int time, ActorRef reciver, Object msg) {
         getContext().system().scheduler().scheduleOnce(
                 Duration.create(time, TimeUnit.MILLISECONDS),
                 reciver,
@@ -223,4 +222,5 @@ public class God extends AbstractActor {
                 getContext().system().dispatcher(), getSelf()
         );
     }
+
 }
