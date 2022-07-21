@@ -18,6 +18,7 @@ public class App {
     final static int n_l1 = 2;
 
     public static void main(String[] args) {
+        // define a task here 
         // write_L1_crash_tasks
         // cwrite_L1_crash_tasks
         String scenario = "cwrite_L1_crash_tasks";

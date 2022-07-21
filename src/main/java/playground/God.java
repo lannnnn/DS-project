@@ -27,27 +27,10 @@ public class God extends AbstractActor {
         } else if (scenario == "cwrite_L1_crash_tasks") {
             cwrite_L1_crash_tasks(Clients,L1cs);
         } else {
-             List<Object> msg = this.generate_tasks(5,5, 5,5);
+            List<Object> msg = this.generate_tasks(5,5, 5,5);
             System.out.println("God: generate "+ msg.toArray().length+ " tasks!");
             this.doing_tasks(msg, Clients);
         }
-//        List<Object> msg = ( 10, 10, L2cs, L1cs);
-
-        // // making task
-
-
-
-        // // sending timeout to caches
-        // setTimeout(20,L1cs.get(0));
-        // setTimeout(3000,L1cs.get(0));
-        // setTimeout(450,L1cs.get(1));
-        // setTimeout(1500,L1cs.get(1));
-        // setTimeout(1,L2cs.get(1));
-        // setTimeout(400,L2cs.get(1));
-
-        // // setTimeout(350,L2cs.get(0));
-        // // setTimeout(1500,L2cs.get(0));
-        // // L2cs.get(0).tell(new Message.CRASH(),getSelf());
         //ending ask every one to print their log
         try {
             TimeUnit.SECONDS.sleep(10);
@@ -112,9 +95,6 @@ public class God extends AbstractActor {
                 ((Message.CWRITE) msg).c = clients.get(clients_index);
                 ((Message.CWRITE) msg).c.tell(((Message.CWRITE) msg), getSelf());
             }
-//            else if (Message.CRASH.class == msg.getClass()) {
-//                setTimeout(350, ((Message.CRASH) msg).target);
-//            }
         }
     }
 
@@ -124,51 +104,29 @@ public class God extends AbstractActor {
         // generate n read operations
         for(int n_r = 0; n_r < n_reads; n_r++){
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
-            Message.READ MSG = new Message.READ(String.valueOf(key_to_ask),
-                    null,
-                    null,
-                    null,
-                    null,
-                    true,
-                    id++);
+            Message.READ MSG = new Message.READ(String.valueOf(key_to_ask), null, null, null, null, true, id++);
             messageList.add(MSG);
         }
         // generate n write operations
         for(int n_w = 0; n_w < n_writes; n_w++){
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
             int value_to_write = key_to_ask*key_to_ask-1;
-            Message.WRITE MSG = new Message.WRITE(String.valueOf(key_to_ask),
-                    String.valueOf(value_to_write),
-                    null,
-                    null,
-                    null,
-                    true,
-                    id++);
+            Message.WRITE MSG = new Message.WRITE(String.valueOf(key_to_ask), String.valueOf(value_to_write),
+                    null, null, null, true, id++);
             messageList.add(MSG);
         }
         // generate n critical read operations
         for(int n_cr = 0; n_cr < n_creads; n_cr++){
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
-            Message.CREAD MSG = new Message.CREAD(String.valueOf(key_to_ask),
-                    null,
-                    null,
-                    null,
-                    null,
-                    true,
-                    id++);
+            Message.CREAD MSG = new Message.CREAD(String.valueOf(key_to_ask), null, null, null, null, true, id++);
             messageList.add(MSG);
         }
         // generate n critical write operations
         for(int n_cw = 0; n_cw < n_cwrites; n_cw++){
             int key_to_ask = ThreadLocalRandom.current().nextInt(0, 10 + 1);
             int value_to_write = -key_to_ask*key_to_ask*10;
-            Message.CWRITE MSG = new Message.CWRITE(String.valueOf(key_to_ask),
-                    String.valueOf(value_to_write),
-                    null,
-                    null,
-                    null,
-                    true,
-                    id++);
+            Message.CWRITE MSG = new Message.CWRITE(String.valueOf(key_to_ask), String.valueOf(value_to_write),
+                    null, null, null,  true, id++);
             messageList.add(MSG);
         }
         Collections.shuffle(messageList);
@@ -211,7 +169,7 @@ public class God extends AbstractActor {
         }
         // first L1 crash msg
         this.SendMessage(100, L1cs.get(0), new Message.CRASH());
-        // a client write a new value
+        // a client critically write a new value
         this.SendMessage(110, Clients.get(0), new Message.CWRITE(String.valueOf(key_to_ask), "1234", Clients.get(0), null, null, true, id++));
 
         // generate n read operations all read the same data
